@@ -9,6 +9,8 @@ website:
       menu : 
         - text: Hands-on Exercise 1 - Geospatial Data Wrangling with R
           href: Hands-on_Ex1/Hands-on_Ex1.1.qmd
+        - text: Hands-on Exercise 1 - Choropleth Mapping with R
+          href: Hands-on_Ex1/Hands-on_Ex1.2.qmd
         - text: Hands-on Exercise 2 - Spatial Weights and Applications
           href: Hands-on_Ex2/Hands-on_Ex2.1.qmd
         - text: Hands-on Exercise 2 - Global Measures of Spatial Autocorrelation
