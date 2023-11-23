@@ -15,7 +15,9 @@ The code chunk below install and load **spdep**, **sf**, **tmap** and **tid
 pacman::p_load(sf, spdep, tmap, tidyverse, knitr)
 ```
 
-###  **Import shapefile into r environment**
+## **Getting the Data Into R Environment**
+
+### **Import shapefile into r environment**
 
 The code chunk below uses [*st_read()*](https://r-spatial.github.io/sf/reference/st_read.html) of **sf** package to import Hunan shapefile into R
 
@@ -34,7 +36,7 @@ hunan2012 <- read_csv("data/aspatial/Hunan_2012.csv")
 
 ### **Performing relational join**
 
-The code chunk below will import update the attribute table of *hunan*\'s SpatialPolygonsDataFrame with the attribute fields of *hunan2012* dataframe.
+The code chunk below will import update the attribute table of *hunan*'s SpatialPolygonsDataFrame with the attribute fields of *hunan2012* dataframe.
 
 ```{r}
 hunan <- left_join(hunan,hunan2012)%>%
@@ -95,7 +97,7 @@ nb1 <- hunan$GDPPC[nb1]
 nb1
 ```
 
-Printed output above shows that the GDPPC of the five nearest neighbours based on Queen\'s method are 20981, 34592, 24473, 21311 and 22879 respectively.
+Printed output above shows that the GDPPC of the five nearest neighbours based on Queen's method are 20981, 34592, 24473, 21311 and 22879 respectively.
 
 ```{r}
 str(wm_q)
@@ -145,7 +147,7 @@ plot(hunan$geometry, border="lightgrey")
 plot(wm_q, coords, pch = 19, cex = 0.6, add = TRUE, col= "red")
 ```
 
-####  Plotting Rook contiguity based neighbours map
+#### Plotting Rook contiguity based neighbours map
 
 ```{r}
 plot(hunan$geometry, border="lightgrey")
@@ -269,7 +271,7 @@ ids
 
 ### **Row-standardised weights matrix**
 
-Next, we need to assign weights to each neighboring polygon. In our case, each neighboring polygon will be assigned equal weight (style=\"W\"). This is accomplished by assigning the fraction 1/(#ofneighbors) to each neighboring county then summing the weighted income values. While this is the most intuitive way to summaries the neighbors\' values it has one drawback in that polygons along the edges of the study area will base their lagged values on fewer polygons thus potentially over- or under-estimating the true nature of the spatial autocorrelation in the data. For this example, we\'ll stick with the style=\"W\" option for simplicity\'s sake but note that other more robust options are available, notably style=\"B\".
+Next, we need to assign weights to each neighboring polygon. In our case, each neighboring polygon will be assigned equal weight (style="W"). This is accomplished by assigning the fraction 1/(#ofneighbors) to each neighboring county then summing the weighted income values. While this is the most intuitive way to summaries the neighbors' values it has one drawback in that polygons along the edges of the study area will base their lagged values on fewer polygons thus potentially over- or under-estimating the true nature of the spatial autocorrelation in the data. For this example, we'll stick with the style="W" option for simplicity's sake but note that other more robust options are available, notably style="B".
 
 ```{r}
 rswm_q <- nb2listw(wm_q, style="W", zero.policy = TRUE)
@@ -278,13 +280,13 @@ rswm_q
 
 The zero.policy=TRUE option allows for lists of non-neighbors. This should be used with caution since the user may not be aware of missing neighbors in their dataset however, a zero.policy of FALSE would return an error.
 
-See the weight of the first polygon\'s eight neighbors type:
+See the weight of the first polygon's eight neighbors type:
 
 ```{r}
 rswm_q$weights[10]
 ```
 
-Each neighbor is assigned a 0.125 of the total weight. This means that when R computes the average neighboring income values, each neighbor\'s income will be multiplied by 0.2 before being tallied.
+Each neighbor is assigned a 0.125 of the total weight. This means that when R computes the average neighboring income values, each neighbor's income will be multiplied by 0.2 before being tallied.
 
 Using the same method, we can also derive a row standardised distance weight matrix by using the code chunk below.
 
