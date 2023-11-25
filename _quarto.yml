@@ -17,6 +17,10 @@ website:
           href: Hands-on_Ex2/Hands-on_Ex2.2.qmd
         - text: Hands-on Exercise 3 - Local Measures of Spatial Autocorrelation
           href: Hands-on_Ex2/Hands-on_Ex2.3.qmd
+    - text : In-Class Exercises
+      menu : 
+        - text: In-Class Exercise 2
+          href: In-Class_Ex2/In-Class_Ex2.qmd
     right:
       - href: index.qmd
         text: Home

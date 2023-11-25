@@ -1,0 +1,138 @@
+---
+title: "In-Class Exercise 2"
+author: "Flora Phyo Zin Htet"
+---
+
+## Getting Started
+
+### Installing and loading the R Package
+
+The code chunk below install and load **sf, tmap, sfdep, tidyverse** and **knitr** packages to R environment
+
+```{r}
+pacman::p_load(sf, tmap, sfdep, tidyverse, knitr)
+```
+
+## The Data
+
+### Importing geospatial data
+
+```{r}
+hunan <- st_read(dsn = "data/geospatial", 
+                 layer = "Hunan")
+```
+
+### Import attribute table
+
+```{r}
+hunan2012 <- read_csv("data/aspatial/Hunan_2012.csv")
+```
+
+### Combining both data frame by using left join
+
+```{r}
+hunan_GDPPC <- left_join(hunan,hunan2012)%>%
+  select(1:4, 6, 7, 15)
+```
+
+In order to retain the geospatial properties, the left data frame must the sf data.frame (i.e. hunan)
+
+## Global Measures of Spatial Association
+
+### Deriving continuity weights: Queen's method
+
+In this code chunk below, queen method is used to derive the continuity weights
+
+```{r}
+wm_q <- hunan_GDPPC %>%
+  mutate(nb = st_contiguity(geometry),
+         wt = st_weights(nb, 
+                         style="W"),
+         .before = 1)
+```
+
+Notice that st_weights() provides tree arguments, they are
+
+-   nb: A neighbor list object as created by st_neighbors()
+
+-   style : Default "W" for row standardized weights. The value can also be "B", "C", "U" "minmax" and "S". B is the basic binary code, W is row standardized (sum over all links to n), C is globally standardized (sums over all links to n). U is euqal to C divided by the number of neighbors (sums over
+
+### Computing local Moran's I
+
+how to compute local Moran's of GDPPC at country level by using local_moran() of sfdep package
+
+```{r}
+lisa <- wm_q %>%
+  mutate(local_moran = local_moran(
+    GDPPC, nb, wt, nsim = 99), 
+         .before = 1) %>%
+  unnest(local_moran)
+```
+
+# EHSA
+
+## Getting Started
+
+### Installing and loading the R Package
+
+The code chunk below install and load **sf, tmap, sfdep, tidyverse** and **plotly** packages to R environment
+
+```{r}
+pacman::p_load(sf, tmap, sfdep, plotly, tidyverse)
+```
+
+```{r}
+hunan <- st_read(dsn = "data/geospatial",                   
+                 layer = "Hunan")
+```
+
+### Timeseries Data
+
+```{r}
+GDPPC <- read_csv("data/aspatial/Hunan_GDPPC.csv")
+```
+
+```{r}
+is_spacetime_cube(GDPPC)
+
+GDPPC_st <- spacetime(GDPPC, hunan,                      
+                      .loc_col = "County",                     
+                      .time_col = "Year")
+```
+
+```{r}
+is_spacetime_cube(GDPPC_st)
+```
+
+### Computing Gi
+
+```{r}
+GDPPC_nb <- GDPPC_st %>%   
+  activate("geometry") %>%   
+  mutate(nb = include_self(st_contiguity(geometry)),          
+         wt = st_inverse_distance(nb, geometry,                                    
+                                  scale = 1,                                    
+                                  alpha = 1),         
+         .before = 1) %>%  
+  set_nbs("nb") %>%   
+  set_wts("wt")
+```
+
+```{r}
+gi_stars <-GDPPC_nb %>%   
+  group_by(Year) %>%   
+  mutate(gi_star = local_gstar_perm(     
+    GDPPC,nb,wt)) %>%   
+  tidyr::unnest(gi_star)
+```
+
+### Emerging Hotspot Analysis
+
+```{r}
+library(Kendall)  
+ehsa <- emerging_hotspot_analysis(   
+  x= GDPPC_st,    
+  .var = "GDPPC",   
+  k = 1,   
+  nsim = 99 )
+```
