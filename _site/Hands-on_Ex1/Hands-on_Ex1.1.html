@@ -139,7 +139,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </li>  
         <li>
     <a class="dropdown-item" href="../Hands-on_Ex2/Hands-on_Ex2.3.html" rel="" target="">
- <span class="dropdown-text">Hands-on Exercise 3 - Local Measures of Spatial Autocorrelation</span></a>
+ <span class="dropdown-text">Hands-on Exercise 2 - Local Measures of Spatial Autocorrelation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../Hands-on_Ex3/Hands-on_Ex3.html" rel="" target="">
+ <span class="dropdown-text">Hands-on Exercise 3 - Processing and Visualising Flow Data</span></a>
   </li>  
     </ul>
   </li>
@@ -155,12 +159,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </ul>
   </li>
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-in-class-exercises-1" role="button" data-bs-toggle="dropdown" aria-expanded="false" rel="" target="">
- <span class="menu-text">In-Class Exercises</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-take-home-exercises" role="button" data-bs-toggle="dropdown" aria-expanded="false" rel="" target="">
+ <span class="menu-text">Take-Home Exercises</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-in-class-exercises-1">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-take-home-exercises">    
         <li>
-    <a class="dropdown-item" href="../Take-Home_Ex1/Take-Home_Ex1.qmd" rel="" target="">
+    <a class="dropdown-item" href="../Take-Home_Ex1/Take-Home_Ex1.html" rel="" target="">
  <span class="dropdown-text">Take-Home Exercise 1</span></a>
   </li>  
     </ul>
@@ -638,7 +642,7 @@ date  (1): last_review
 <p>Things to learn from the arguments above:</p>
 <ul>
 <li><p><em>coords</em> argument requires you to provide the column name of the x-coordinates first then followed by the column name of the y-coordinates.</p></li>
-<li><p><em>crs</em> argument requires you to provide the coordinates system in epsg format. <a href="https://epsg.io/4326">EPSG: 4326</a> is wgs84 Geographic Coordinate System and <a href="https://epsg.io/3414">EPSG: 3414</a> is Singapore SVY21 Projected Coordinate System. You can search for other country's epsg code by referring to <a href="https://epsg.io/">epsg.io</a>.</p></li>
+<li><p><em>crs</em> argument requires you to provide the coordinates system in epsg format. <a href="https://epsg.io/4326">EPSG: 4326</a> is wgs84 Geographic Coordinate System and <a href="https://epsg.io/3414">EPSG: 3414</a> is Singapore SVY21 Projected Coordinate System. You can search for other country’s epsg code by referring to <a href="https://epsg.io/">epsg.io</a>.</p></li>
 <li><p><em>%&gt;%</em> is used to nest <em>st_transform()</em> to transform the newly created simple feature data frame into svy21 projected coordinates system.</p></li>
 </ul>
 <p>Let us examine the content of this newly created simple feature data frame.</p>
