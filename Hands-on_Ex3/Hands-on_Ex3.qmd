@@ -42,7 +42,7 @@ odbus$DESTINATION_PT_CODE <- as.factor(odbus$DESTINATION_PT_CODE)
 
 ### **Extracting the study data**
 
-For the purpose of this exercise, we will extract commuting flows on weekday and between 6 and 9 o\'clock.
+For the purpose of this exercise, we will extract commuting flows on weekday and between 6 and 9 o'clock.
 
 ```{r}
 odbus6_9 <- odbus %>%
@@ -98,6 +98,10 @@ mpsz <- st_read(dsn = "data/geospatial",
 
 ```{r}
 mpsz
+```
+
+```{r}
+mpsz <- write_rds(mpsz, "data/rds/mpsz.rds")
 ```
 
 ## **Geospatial data wrangling**

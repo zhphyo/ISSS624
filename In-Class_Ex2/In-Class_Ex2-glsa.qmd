@@ -1,0 +1,61 @@
+---
+title: "In-Class_Ex2-glsa"
+author: "Flora"
+---
+
+```{r}
+pacman::p_load(sf, sfdep, tmap, plotly, tidyverse)
+
+
+hunan <- st_read(dsn = "data/geospatial", 
+                 layer = "Hunan")
+
+GDPPC <- read_csv("data/aspatial/Hunan_GDPPC.csv")
+```
+
+```{r}
+hunan2012 <- read_csv("data/aspatial/Hunan_2012.csv")
+
+hunan_GDPPC <- left_join(hunan, hunan2012) %>%
+  select(1:4, 7, 15)
+```
+
+```{r}
+wm_q <- hunan_GDPPC %>%
+  mutate(nb = st_contiguity(geometry),
+         wt = st_weights(nb,
+                         style = "W"),
+         .before = 1) 
+
+wm_q
+```
+
+```{r}
+moranI <- global_moran(wm_q$GDPPC,
+                       wm_q$nb,
+                       wm_q$wt)
+glimpse(moranI)
+```
+
+```{r}
+global_moran_test(wm_q$GDPPC,  wm_q$nb, wm_q$wt)
+```
+
+```{r}
+set.seed(1234)
+```
+
+```{r}
+global_moran_perm(wm_q$GDPPC,
+                       wm_q$nb,
+                       wm_q$wt,
+                  nsim = 99)
+```
+
+```{r}
+lisa <- wm_q %>% 
+  mutate(local_moran = local_moran(
+    GDPPC, nb, wt, nsim = 99),
+         .before = 1) %>%
+  unnest(local_moran)
+```

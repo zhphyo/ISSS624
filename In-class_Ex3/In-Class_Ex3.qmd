@@ -1,0 +1,224 @@
+---
+title: "In-Class Ex 3"
+author: "Flora Phyo Zin Htet"
+---
+
+## **Getting Started**
+
+The code chunk below install and load R packages into R environment
+
+```{r}
+pacman::p_load(tmap, sf, sp, DT, 
+               performance, reshape2,
+               ggpubr, tidyverse)
+```
+
+## **Computing Distance Matrix**
+
+Import *mpsz.rds* into R environemnt by using the code chunk below.
+
+Note : rds contains all the r objects.
+
+```{r}
+mpsz <- read_rds("data/rds/mpsz.rds")
+mpsz
+```
+
+### **Converting from sf data.table to SpatialPolygonsDataFrame (sp)**
+
+There are at least two ways to compute the required distance matrix. One is based on sf and the other is based on sp. Past experience shown that computing distance matrix by using sf function took relatively longer time that sp method especially the data set is large. In view of this, sp method is used in the code chunks below.
+
+First [`as.Spatial()`](https://r-spatial.github.io/sf/reference/coerce-methods.html) will be used to convert *mpsz* from sf tibble data frame to SpatialPolygonsDataFrame of sp object as shown in the code chunk below.
+
+mpsz_sp become list. includes mpsz dataframe (under data without geometric column).
+
+Both code chunk below works the same.
+
+*mpsz_sp \<- mpsz %\>% as.Spatial()*
+
+```{r}
+mpsz_sp <- as(mpsz, "Spatial")
+mpsz_sp
+```
+
+### **Computing the distance matrix**
+
+Next, [`spDists()`](https://www.rdocumentation.org/packages/sp/versions/2.1-1/topics/spDistsN1) of sp package will be used to compute the Euclidean distance between the centroids of the planning subzones.
+
+spDists() is recommended for Bigger dataset.
+
+```{r}
+dist <- spDists(mpsz_sp, 
+                longlat = FALSE)
+head(dist, n=c(10, 10))
+```
+
+### **Labelling column and row heanders of a distance matrix**
+
+First, we will create a list sorted according to the the distance matrix by planning sub-zone code.
+
+```{r}
+sz_names <- mpsz$SUBZONE_C
+```
+
+Next we will attach `SUBZONE_C` to row and column for distance matrix matching ahead
+
+```{r}
+colnames(dist) <- paste0(sz_names)
+rownames(dist) <- paste0(sz_names)
+```
+
+### **Pivoting distance value by SUBZONE_C**
+
+Next, we will pivot the distance matrix into a long t
+
+```{r}
+distPair <- melt(dist) %>%
+  rename(dist = value)
+head(distPair, 10)
+```
+
+Notice that the within zone distance is 0.
+
+### **Updating intra-zonal distances**
+
+In this section, we are going to append a constant value to replace the intra-zonal distance of 0.
+
+First, we will select and find out the minimum value of the distance by using `summary()`.
+
+```{r}
+distPair %>%
+  filter(dist > 0) %>%
+  summary()
+```
+
+Next, a constant distance value of 50m is added into intra-zones distance.
+
+```{r}
+distPair$dist <- ifelse(distPair$dist == 0,
+                        50, distPair$dist)
+```
+
+The code chunk below will be used to check the result data.frame.
+
+```{r}
+distPair %>%
+  summary()
+```
+
+The code chunk below is used to rename the origin and destination fields
+
+```{r}
+distPair <- distPair %>%
+  rename(orig = Var1,
+         dest = Var2)
+```
+
+Lastly, the code chunk below is used to save the dataframe for future use.
+
+```{r}
+write_rds(distPair, "data/rds/distPair.rds") 
+```
+
+## **Preparing flow data**
+
+The code chunk below is used import *od_data* save in Chapter 15 into R environment.
+
+```{r}
+od_data <- read_rds("data/rds/od_data.rds")
+```
+
+Next, we will compute the total passenger trip between and within planning subzones by using the code chunk below. The output is all *flow_data*.
+
+```{r}
+flow_data <- od_data %>%
+  group_by(ORIGIN_SZ, DESTIN_SZ) %>% 
+  summarize(TRIPS = sum(MORNING_PEAK)) 
+```
+
+```{r}
+head(flow_data, 10)
+```
+
+### **Separating intra-flow from passenger volume**
+
+Code chunk below is used to add three new fields in `flow_data` dataframe.
+
+```{r}
+flow_data$FlowNoIntra <- ifelse(
+  flow_data$ORIGIN_SZ == flow_data$DESTIN_SZ, 
+  0, flow_data$TRIPS)
+flow_data$offset <- ifelse(
+  flow_data$ORIGIN_SZ == flow_data$DESTIN_SZ, 
+  0.000001, 1)
+```
+
+### **Combining passenger volume data with distance value**
+
+Before we can join *flow_data* and *distPair*, we need to convert data value type of *ORIGIN_SZ* and *DESTIN_SZ* fields of flow_data dataframe into factor data type.
+
+```{r}
+flow_data$ORIGIN_SZ <- as.factor(flow_data$ORIGIN_SZ)
+flow_data$DESTIN_SZ <- as.factor(flow_data$DESTIN_SZ)
+```
+
+Now, `left_join()` of **dplyr** will be used to *flow_data* dataframe and *distPair* dataframe. The output is called *flow_data1*.
+
+```{r}
+flow_data1 <- flow_data %>%
+  left_join (distPair,
+             by = c("ORIGIN_SZ" = "orig",
+                    "DESTIN_SZ" = "dest"))
+```
+
+## **Preparing Origin and Destination Attributes**
+
+### **Importing population data**
+
+```{r}
+pop <- read_csv("data/aspatial/pop.csv")
+```
+
+### **Geospatial data wrangling**
+
+just wanna have zone code. Reference is non-spatial, mpsz is spatial
+
+```{r}
+pop <- pop %>%
+  left_join(mpsz,
+            by = c("PA" = "PLN_AREA_N",
+                   "SZ" = "SUBZONE_N")) %>%
+  select(1:6) %>%
+  rename(SZ_NAME = SZ,
+         SZ = SUBZONE_C)
+```
+
+### **Preparing origin attribute**
+
+```{r}
+flow_data1 <- flow_data1 %>%
+  left_join(pop,
+            by = c(ORIGIN_SZ = "SZ")) %>%
+  rename(ORIGIN_AGE7_12 = AGE7_12,
+         ORIGIN_AGE13_24 = AGE13_24,
+         ORIGIN_AGE25_64 = AGE25_64) %>%
+  select(-c(PA, SZ_NAME))
+```
+
+### **Preparing destination attribute**
+
+```{r}
+flow_data1 <- flow_data1 %>%
+  left_join(pop,
+            by = c(DESTIN_SZ = "SZ")) %>%
+  rename(DESTIN_AGE7_12 = AGE7_12,
+         DESTIN_AGE13_24 = AGE13_24,
+         DESTIN_AGE25_64 = AGE25_64) %>%
+  select(-c(PA, SZ_NAME))
+```
+
+We will called the output data file *SIM_data*. it is in rds data file format.
+
+```{r}
+write_rds(flow_data1, "data/rds/SIM_data")
+```
