@@ -253,6 +253,8 @@ In this section we will use the maps and spatial data tools to uncover patterns,
 ::: panel-tabset
 ## Weekday morning peak
 
+### Filter data 
+
 Below chunk of code creates data set *pv_wkday_6to9_202310* by filtering the data from the pv dataset for weekday morning peak between 6AM and 9AM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
 
 ```{r}
@@ -262,21 +264,37 @@ pv_wkday_6to9_202310 <- pv %>%
   summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
 ```
 
+### Performing relational join
+
+Call function **joined_bs_pv** to join Bus Stop (*bs*) with the attribute fields of *Passenger Volume (pv)* dataset for weekday morning peak.
+
 ```{r}
 wkday_6to9_202310_sf <- joined_bs_pv (bs, pv_wkday_6to9_202310)
 ```
+
+### Create hexagon grid
+
+Call function **honeycomb_grid()** to create hexagonal grid over weekday morning peak
 
 ```{r}
 wkday_6to9_trips <- honeycomb_grid(wkday_6to9_202310_sf) 
 ```
 
+### Plot hexagon grid
+
+Call function **plot_honeycomb_grid_with_trips()** to plot interactive map for weekday morning peak.
+
 ```{r}
 plot_honeycomb_grid_with_trips(wkday_6to9_trips) 
 ```
 
+### Analysis 
+
 In suburban areas like Woodlands/Yishun, Choa Chu Kang, and Jurong, it is quite common to observe significant passenger trip volumes in the morning rush, ranging from 100,000 to 300,000. In addition, the Punggol/Sengkang area also has substantial amounts of traffic ranging from 50,000 to 300,000 trips per day, which indicates that there is a substantial commuter population. Due to this, it is clear that commuters are present during rush hour during the morning, and thus there is a need to enhance transportation services and manage congestion in these areas.
 
 ## Weekday afternoon peak
+
+### Filter data
 
 Below chunk of code creates data set pv_wkday_5to8_202310 by filtering the data from the pv dataset for weekday afternoon peak between 5PM to 8PM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
 
@@ -287,21 +305,37 @@ pv_wkday_5to8_202310 <- pv %>%
   summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
 ```
 
+### **Performing relational join**
+
+Call function **joined_bs_pv** to join Bus Stop (bs) with the attribute fields of Passenger Volume (pv) dataset for weekday afternoon peak.
+
 ```{r}
 wkday_5to8_202310_sf <- joined_bs_pv (bs, pv_wkday_5to8_202310)
 ```
+
+### **Create hexagon grid**
+
+Call function **honeycomb_grid()** to create hexagonal grid over weekday afternoon peak
 
 ```{r}
 wkday_5to8_trips <- honeycomb_grid(wkday_5to8_202310_sf) 
 ```
 
+### **Plot hexagon grid**
+
+Call function **plot_honeycomb_grid_with_trips()** to plot interactive map for weekday afternoon peak.
+
 ```{r}
-plot_honeycomb_grid_with_trips(wkday_5to8_trips) 
+plot_honeycomb_grid_with_trips(wkday_5to8_trips)
 ```
+
+### Analysis
 
 While trip volumes are lower compared to the morning peak, select residential areas still experience 50,000 to 300,000 trips, indicating the presence of evening commuters. Analyzing the reasons behind evening commuting, such as flexible work hours, can help optimize transit schedules and infrastructure.
 
 ## Weekend/holiday morning peak
+
+### Filter data
 
 Below chunk of code creates data set pv_wkend_11to2_202310 by filtering the data from the pv dataset for weekend/holiday morning peak between 11AM and 2PM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
 
@@ -312,21 +346,37 @@ pv_wkend_11to2_202310 <- pv %>%
   summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
 ```
 
+**Performing relational join**
+
+Call function **joined_bs_pv** to join Bus Stop (bs) with the attribute fields of Passenger Volume (pv) dataset for weekend/holiday morning peak.
+
 ```{r}
 wkend_11to2_202310_sf <- joined_bs_pv (bs, pv_wkend_11to2_202310)
 ```
+
+**Create hexagon grid**
+
+Call function **honeycomb_grid()** to create hexagonal grid over weekend/holiday morning peak.
 
 ```{r}
 wkend_11to2_trips <- honeycomb_grid(wkend_11to2_202310_sf) 
 ```
 
+**Plot hexagon grid**
+
+Call function **plot_honeycomb_grid_with_trips()** to plot interactive map for weekend/holiday morning peak.
+
 ```{r}
 plot_honeycomb_grid_with_trips(wkend_11to2_trips) 
 ```
 
+### Analysis
+
 There is a consistent number of trips generated during weekend mornings in residential areas, ranging from 5,000 to 50,000, which is a sign that residents and visitors are engaged in leisure activities or on family outings at this time. In order to meet the needs of a leisure-oriented crowd in these regions, it is imperative that recreational facilities and transit options be optimized.
 
 ## Weekend/holiday evening peak
+
+### Filter data
 
 Below chunk of code creates data set pv_wkend_4to7_202310 by filtering the data from the pv dataset for weekend/holiday evening peak between 4PM and 7PM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
 
@@ -337,20 +387,36 @@ pv_wkend_4to7_202310 <- pv %>%
   summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
 ```
 
+### **Performing relational join**
+
+Call function **joined_bs_pv** to join Bus Stop (bs) with the attribute fields of Passenger Volume (pv) dataset for weekday/holiday afternoon peak.
+
 ```{r}
 wkend_4to7_202310_sf <- joined_bs_pv (bs, pv_wkend_4to7_202310)
 ```
+
+### **Create hexagon grid**
+
+Call function **honeycomb_grid()** to create hexagonal grid over weekday/holiday afternoon peak
 
 ```{r}
 wkend_4to7_trips <- honeycomb_grid(wkend_4to7_202310_sf) 
 ```
 
+### **Plot hexagon grid**
+
+Call function **plot_honeycomb_grid_with_trips()** to plot interactive map for weekday/holiday afternoon peak.
+
 ```{r}
 plot_honeycomb_grid_with_trips(wkend_4to7_trips) 
 ```
 
+### Analysis
+
 During the evening peak on weekends and holidays, trip volumes between 5,000 and 50,000 indicate ongoing social or leisure activities in residential areas. It's vital to have adequate parking and public transportation, especially in popular entertainment districts at night. When planning recreational facilities, it's helpful to know what kind of activities and attractions draw visitors during these times.
 :::
+
+## Summary 
 
 Passenger trip patterns during both weekday morning and afternoon underscore the importance of commuter-centric transportation. In the morning peak, commuters are concentrated in suburban areas, so transportation services need to be improved. The afternoon peak indicates evening commuters, suggesting transit schedules be optimized to accommodate flexible work hours. In order to meet commuters' diverse needs throughout the day, a well-adapted and efficient transportation system is crucial.
 
