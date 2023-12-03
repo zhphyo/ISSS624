@@ -15,12 +15,8 @@ In real-world practices, the use of these massive locational aware data, however
 
 The code chunk below install and load **sf, sfdep,** **tmap**, **tidyverse, dplyr** and **mapview** packages into R environment
 
-check if can remove mapview
-
-check if can remove dplyr
-
 ```{r}
-pacman::p_load(sf, sfdep, tmap, tidyverse, dplyr, mapview)
+pacman::p_load(sf, sfdep, tmap, tidyverse)
 ```
 
 # **Data Preparation**
@@ -29,7 +25,7 @@ Dataset used in this assignment are
 
 **Geospatial data** : *Bus Stop Location* from LTA DataMall. It provides information about all the bus stops currently being serviced by buses, including the bus stop code (identifier) and location coordinates.
 
-**Apstial data :** *Passenger Volume by Origin Destination Bus Stops for Oct 2023* downloaded from [LTA DataMall](https://datamall.lta.gov.sg/content/datamall/en.html).
+**Aspatial data :** *Passenger Volume by Origin Destination Bus Stops for Oct 2023* downloaded from [LTA DataMall](https://datamall.lta.gov.sg/content/datamall/en.html).
 
 ## **Geospatial data**
 
@@ -131,7 +127,7 @@ Before starting to analyse data, use ***glimpse()*** to look at certain attribut
 glimpse(bs)
 ```
 
-## **Apstial data**
+## **Aspstial data**
 
 ### Import Passenger Volume csv file into R environment
 
@@ -424,4 +420,4 @@ We can observe that for Weekend/Holiday mornings and evenings, trip volumes are 
 
 By analyzing these spatial patterns, urban planners and policymakers can optimize transportation infrastructure, identify high demand areas for public transportation, and plan for congestion management during peak periods in a way that maximizes efficiency and efficiency. In addition, it provides valuable insights into commuter behavior, emphasizing the necessity to tailor transportation services within Singapore based on different time intervals and geographical areas.
 
-# **Emerging Hot Spot Analysis(EHSA)**
+# 
