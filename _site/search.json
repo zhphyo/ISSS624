@@ -11,7 +11,7 @@
     "href": "Take-home_Ex1/Take-home_Ex1.html#installing-and-loading-the-r-packages",
     "title": "Take-home Exercise 1 - Geospatial Analytics for Public Good",
     "section": "Installing and Loading the R Packages",
-    "text": "Installing and Loading the R Packages\nThe code chunk below install and load sf, sfdep, tmap, tidyverse, dplyr and mapview packages into R environment\ncheck if can remove mapview\ncheck if can remove dplyr\n\npacman::p_load(sf, sfdep, tmap, tidyverse, dplyr, mapview)"
+    "text": "Installing and Loading the R Packages\nThe code chunk below install and load sf, sfdep, tmap, tidyverse, dplyr and mapview packages into R environment\n\npacman::p_load(sf, sfdep, tmap, tidyverse)"
   },
   {
     "objectID": "Take-home_Ex1/Take-home_Ex1.html#geospatial-data",
@@ -474,5 +474,12 @@
     "title": "ISSS624",
     "section": "",
     "text": "Welcome to ISSS624 Geospatial Analytics Applications!\nIn this webpage, I am going to share with you my learning journey of geospatial analytics."
+  },
+  {
+    "objectID": "Take-home_Ex1/Take-home_Ex1.html#aspstial-data",
+    "href": "Take-home_Ex1/Take-home_Ex1.html#aspstial-data",
+    "title": "Take-home Exercise 1 - Geospatial Analytics for Public Good",
+    "section": "Aspstial data",
+    "text": "Aspstial data\n\nImport Passenger Volume csv file into R environment\nUse Postman download Passenger Volume by Origin Destination Bus Stops downloaded from LTA DataMall.\n\nImport origin_destination_bus_202310.csv into R by using read_csv() of readr package. The output is R data frame class, pv.\n\npv &lt;- read_csv(\"data/aspatial/origin_destination_bus_202310.csv\")\n\nRows: 5694297 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (5): YEAR_MONTH, DAY_TYPE, PT_TYPE, ORIGIN_PT_CODE, DESTINATION_PT_CODE\ndbl (2): TIME_PER_HOUR, TOTAL_TRIPS\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.\n\n\nUse head() function to print first few rows of the data frame to quickly inspect the dataset’s structure and content.\n\nhead(pv)\n\n# A tibble: 6 × 7\n  YEAR_MONTH DAY_TYPE   TIME_PER_HOUR PT_TYPE ORIGIN_PT_CODE DESTINATION_PT_CODE\n  &lt;chr&gt;      &lt;chr&gt;              &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;          &lt;chr&gt;              \n1 2023-10    WEEKENDS/…            16 BUS     04168          10051              \n2 2023-10    WEEKDAY               16 BUS     04168          10051              \n3 2023-10    WEEKENDS/…            14 BUS     80119          90079              \n4 2023-10    WEEKDAY               14 BUS     80119          90079              \n5 2023-10    WEEKDAY               17 BUS     44069          17229              \n6 2023-10    WEEKENDS/…            17 BUS     20281          20141              \n# ℹ 1 more variable: TOTAL_TRIPS &lt;dbl&gt;\n\n\n\n\nPerforming relational join\nWrite a function to join Bus Stop (bs) with the attribute fields of Passenger Volume (pv) dataset. This is performed by using left_join() of dplyr package. This function will also convert the data into spatial object using st_as_sf() of sf package and filter out the records where the columns ‘X’, ‘Y’ and ‘ORIGIN_TOTAL_TRIPS’ doesn’t contain any value (NA).\nThis function will be used in the [Geovisualisation and Analysis] section.\n\njoined_bs_pv &lt;- function(bs, pv) {\n  joined_data &lt;- left_join(bs, pv, by = c(\"BUS_STOP_N\" = \"ORIGIN_PT_CODE\")) %&gt;%\n    select(BUS_STOP_N, X, Y, ORIGIN_TOTAL_TRIPS, geometry)\n  \n  sf = joined_data %&gt;%\n    # lng/lat value are missing in some records\n    filter(!is.na(X) & !is.na(Y) & !is.na(ORIGIN_TOTAL_TRIPS)) %&gt;%\n    st_as_sf(coords = c(\"X\", \"Y\"), crs = 3414, remove = FALSE)\n  \n  return (sf)\n}"
   }
 ]
