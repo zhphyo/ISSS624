@@ -1,0 +1,361 @@
+---
+title: "Take-home Exercise 1 - Geospatial Analytics for Public Good"
+author: "Flora Phyo Zin Htet"
+---
+
+# **Overview**
+
+As city-wide urban infrastructures such as buses, taxis, mass rapid transit, public utilities and roads become digital, the datasets obtained can be used as a framework for tracking movement patterns through space and time. This is particularly true with the recent trend of massive deployment of pervasive computing technologies such as GPS and RFID on the vehicles. For example, routes and ridership data were collected with the use of smart cards and Global Positioning System (GPS) devices available on the public buses. These massive movement data collected are likely to contain structure and patterns that provide useful information about characteristics of the measured phenomena. The identification, analysis and comparison of such patterns will provide greater insights on human movement and behaviours within a city. These understandings will potentially contribute to a better urban management and useful information for urban transport services providers both from the private and public sector to formulate informed decision to gain competitive advantage.
+
+In real-world practices, the use of these massive locational aware data, however, tend to be confined to simple tracking and mapping with GIS applications. This is mainly due to a general lack of functions in conventional GIS which is capable of analysing and model spatial and spatio-temporal data effectively.
+
+# **Getting Started**
+
+## **Installing and Loading the R Packages**
+
+The code chunk below install and load **sf, sfdep,** **tmap**, **tidyverse, dplyr** and **mapview** packages into R environment
+
+check if can remove mapview
+
+check if can remove dplyr
+
+```{r}
+pacman::p_load(sf, sfdep, tmap, tidyverse, dplyr, mapview)
+```
+
+# **Data Preparation**
+
+Dataset used in this assignment are
+
+**Geospatial data** : *Bus Stop Location* from LTA DataMall. It provides information about all the bus stops currently being serviced by buses, including the bus stop code (identifier) and location coordinates.
+
+**Apstial data :** *Passenger Volume by Origin Destination Bus Stops for Oct 2023* downloaded from [LTA DataMall](https://datamall.lta.gov.sg/content/datamall/en.html).
+
+## **Geospatial data**
+
+### Import Bus Stop Geospatial Data into R environment
+
+Load the Bus Stop GIS by using st_read() from sf package.
+
+```{r}
+bs = st_read(dsn="data/geospatial", layer="BusStop")
+```
+
+### Data Wrangling
+
+Clean the data to ensure the accuracy before conducting our analysis.
+
+#### Check duplicate geometry
+
+Below code chunk converts the geometry to text, identifies the rows with duplicate geometries. We use the ***st_as_text()*** from **sf** package to convert the geometry object to their WKT(Well-Known Text) string representation. We will then used the ***duplicated()*** function get the duplicate records with same geometry in bs data frame.
+
+From the result below, we identified total 2 records that is duplicates.
+
+```{r}
+# Calculate WKT for each geometry
+bs <- bs %>% 
+  mutate(temp_geo = st_as_text(geometry))
+
+# Find duplicate geometries
+duplicate_geometries <- bs %>% 
+  filter(duplicated(temp_geo) | duplicated(temp_geo, fromLast = TRUE))
+
+# Print duplicate geometries
+print(duplicate_geometries)
+```
+
+We will now use the ***filter()*** function **dplyr** package to filter rows in bs data frame to keep non duplicate records. Lastly, remove temp_geo column from bs data frame which is the temporary column that used to check the duplicate geometry value.
+
+```{r}
+# Remove duplicate geometries
+bs <- bs %>% 
+  filter(!duplicated(temp_geo))
+
+#remove the temp column if not needed
+bs <- bs %>% select(-temp_geo)
+```
+
+#### Check duplicate Bus Stop No
+
+Below code chunk identifies the rows with duplicate BUS_STOP_N. We will then used the ***duplicated()*** function get the duplicate records with same BUS_STOP_N in bs data frame.
+
+From the result below, we identified 30 records that is duplicates.
+
+```{r}
+# Calculate WKT for each geometry
+bs <- bs %>% 
+  mutate(temp_bs = BUS_STOP_N)
+
+# Find duplicate geometries
+duplicate_bs_n <- bs %>% 
+  filter(duplicated(temp_bs) | duplicated(temp_bs, fromLast = TRUE))
+
+# Print duplicate geometries
+print(duplicate_bs_n)
+
+```
+
+We will now use the ***filter()*** function **dplyr** package to filter rows in bs data frame to keep non duplicate records. Lastly, remove temp_bs column from bs data frame which is the temporary column that used to check the duplicate BUS_STOP_N value.
+
+```{r}
+# Remove duplicate geometries
+bs <- bs %>% 
+  filter(!duplicated(temp_bs))
+
+#remove the temp column if not needed
+bs <- bs %>% select(-temp_bs)
+```
+
+#### Transform Data
+
+Transform the dataset to CRS 3414 and extract X and Y coordinates from geometry. Join the X,Y coordinates to bs data set.
+
+```{r}
+bs = st_transform(bs, 3414)
+
+bs_XY = do.call(rbind, st_geometry(bs)) %>% 
+    as_tibble() %>% setNames(c("X","Y"))
+
+bs = cbind(bs, bs_XY)
+```
+
+Use ***st_crs()*** function from **sf** package to validate and obtain the information about coordinate system associated with bs object.
+
+```{r}
+st_crs(bs)
+```
+
+Before starting to analyse data, use ***glimpse()*** to look at certain attributes of the spatial features to gain understanding of our dataset.
+
+```{r}
+glimpse(bs)
+```
+
+## **Apstial data**
+
+### Import Passenger Volume csv file into R environment
+
+Use Postman download *Passenger Volume by Origin Destination Bus Stops* downloaded from [LTA DataMall](https://datamall.lta.gov.sg/content/datamall/en.html).
+
+![](Postman.png)
+
+Import origin_destination_bus_202310.csv into R by using read_csv() of **readr** package. The output is R data frame class, *pv*.
+
+```{r}
+pv <- read_csv("data/aspatial/origin_destination_bus_202310.csv")
+```
+
+Use head() function to print first few rows of the data frame to quickly inspect the dataset's structure and content.
+
+```{r}
+head(pv)
+```
+
+### Performing relational join
+
+Write a function to join Bus Stop (*bs*) with the attribute fields of *Passenger Volume (pv)* dataset. This is performed by using ***left_join()*** of **dplyr** package. This function will also convert the data into spatial object using **st_as_sf()** of sf package and filter out the records where the columns 'X', 'Y' and 'ORIGIN_TOTAL_TRIPS' doesn't contain any value (NA).
+
+This function will be used in the \[Geovisualisation and Analysis\] section.
+
+```{r}
+joined_bs_pv <- function(bs, pv) {
+  joined_data <- left_join(bs, pv, by = c("BUS_STOP_N" = "ORIGIN_PT_CODE")) %>%
+    select(BUS_STOP_N, X, Y, ORIGIN_TOTAL_TRIPS, geometry)
+  
+  sf = joined_data %>%
+    # lng/lat value are missing in some records
+    filter(!is.na(X) & !is.na(Y) & !is.na(ORIGIN_TOTAL_TRIPS)) %>%
+    st_as_sf(coords = c("X", "Y"), crs = 3414, remove = FALSE)
+  
+  return (sf)
+}
+```
+
+## Create and plot spatial hexagon grids
+
+### Create hexagon grid
+
+Write a function to create hexagonal grid over a given set of spatial points - input, counts and sums trip data within each grid cell, and then filters out cells with no or zero trips. It's used for \[Geovisualisation and Analysis\] section to understand on trip distribution.
+
+```{r}
+honeycomb_grid <- function(input) {
+  #Create a grid which the extent equals to the bounding box of the selected points
+  area_honeycomb_grid <- st_make_grid(input, c(500), what = "polygons", square = FALSE)
+  
+  # To sf and add grid ID
+  area_honeycomb_grid_sf <- st_sf(area_honeycomb_grid) %>%
+    # add grid ID
+    mutate(grid_id = 1:length(lengths(area_honeycomb_grid)))
+  
+  #Sum the number of passenger points in each grid
+  count_points <- st_intersection(area_honeycomb_grid_sf, input) %>%
+    group_by(grid_id) %>%
+    summarize(sum_trips = sum(ORIGIN_TOTAL_TRIPS, na.rm = TRUE)) %>%
+    rename(count_grid_id = grid_id)
+  
+  #Merge the point counts back to the honeycomb grid
+  area_honeycomb_grid_sf <- area_honeycomb_grid_sf %>%
+    st_join(count_points, by = "grid_id")
+  
+  # Remove grid without value 
+  filtered_area_honeycomb_grid_sf <- area_honeycomb_grid_sf %>%
+    filter(!is.na(sum_trips) & sum_trips > 0) %>%
+    select(-count_grid_id)
+  
+  filtered_area_honeycomb_grid_sf <- filtered_area_honeycomb_grid_sf %>%
+  rename(geometry=area_honeycomb_grid)
+  
+  return (filtered_area_honeycomb_grid_sf)
+}
+```
+
+### Plot hexagon grid
+
+This code chunk will plot the grid into a interactive map with **tmap.** This function will use in \[Geovisualisation and Analysis\] section to plot a map with hexagon grid.
+
+```{r}
+plot_honeycomb_grid_with_trips <- function(input) {
+  tmap_mode("view")
+ 
+  # Plot the honeycomb grid with the summed trips
+  tm_shape(input) +
+    tm_fill(
+      col = "sum_trips",
+      palette = "Reds",
+      style = "fixed",
+      breaks = c(1, 1000, 5000, 10000, 50000, 100000, 300000, 600000),
+      title = "Total Trips",
+      id = "grid_id",
+      showNA = FALSE,
+      alpha = 0.6,
+      popup.vars = c(
+        "Total Trips: " = "sum_trips"
+      ),
+      popup.format = list(
+        sum_trips = list(format = "f", digits = 0)
+      )
+    ) +
+    tm_borders(col = "grey40", lwd = 0.7)
+  }
+```
+
+# **Geovisualisation and Analysis**
+
+In this section we will use the maps and spatial data tools to uncover patterns, trends, and insights with the reference to the time intervals provided in the table below, compute the passenger trips generated by origin at the hexagon level.
+
+| Peak hour period             | Bus tap on time |
+|------------------------------|-----------------|
+| Weekday morning peak         | 6am to 9am      |
+| Weekday afternoon peak       | 5pm to 8pm      |
+| Weekend/holiday morning peak | 11am to 2pm     |
+| Weekend/holiday evening peak | 4pm to 7pm      |
+
+::: panel-tabset
+## Weekday morning peak
+
+Below chunk of code creates data set *pv_wkday_6to9_202310* by filtering the data from the pv dataset for weekday morning peak between 6AM and 9AM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
+
+```{r}
+pv_wkday_6to9_202310 <- pv %>%
+  group_by(YEAR_MONTH, DAY_TYPE, ORIGIN_PT_CODE) %>%
+  filter(YEAR_MONTH == "2023-10" & DAY_TYPE == "WEEKDAY" & TIME_PER_HOUR >= 6 & TIME_PER_HOUR <= 9) %>%
+  summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
+```
+
+```{r}
+wkday_6to9_202310_sf <- joined_bs_pv (bs, pv_wkday_6to9_202310)
+```
+
+```{r}
+wkday_6to9_trips <- honeycomb_grid(wkday_6to9_202310_sf) 
+```
+
+```{r}
+plot_honeycomb_grid_with_trips(wkday_6to9_trips) 
+```
+
+In suburban areas like Woodlands/Yishun, Choa Chu Kang, and Jurong, it is quite common to observe significant passenger trip volumes in the morning rush, ranging from 100,000 to 300,000. In addition, the Punggol/Sengkang area also has substantial amounts of traffic ranging from 50,000 to 300,000 trips per day, which indicates that there is a substantial commuter population. Due to this, it is clear that commuters are present during rush hour during the morning, and thus there is a need to enhance transportation services and manage congestion in these areas.
+
+## Weekday afternoon peak
+
+Below chunk of code creates data set pv_wkday_5to8_202310 by filtering the data from the pv dataset for weekday afternoon peak between 5PM to 8PM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
+
+```{r}
+pv_wkday_5to8_202310 <- pv %>%
+  group_by(YEAR_MONTH, DAY_TYPE, ORIGIN_PT_CODE) %>%
+  filter(YEAR_MONTH == "2023-10" & DAY_TYPE == "WEEKDAY" & TIME_PER_HOUR >= 17 & TIME_PER_HOUR <= 20) %>%
+  summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
+```
+
+```{r}
+wkday_5to8_202310_sf <- joined_bs_pv (bs, pv_wkday_5to8_202310)
+```
+
+```{r}
+wkday_5to8_trips <- honeycomb_grid(wkday_5to8_202310_sf) 
+```
+
+```{r}
+plot_honeycomb_grid_with_trips(wkday_5to8_trips) 
+```
+
+While trip volumes are lower compared to the morning peak, select residential areas still experience 50,000 to 300,000 trips, indicating the presence of evening commuters. Analyzing the reasons behind evening commuting, such as flexible work hours, can help optimize transit schedules and infrastructure.
+
+## Weekend/holiday morning peak
+
+Below chunk of code creates data set pv_wkend_11to2_202310 by filtering the data from the pv dataset for weekend/holiday morning peak between 11AM and 2PM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
+
+```{r}
+pv_wkend_11to2_202310 <- pv %>%
+  group_by(YEAR_MONTH, DAY_TYPE, ORIGIN_PT_CODE) %>%
+  filter(YEAR_MONTH == "2023-10" & DAY_TYPE == "WEEKENDS/HOLIDAY" & TIME_PER_HOUR >= 11 & TIME_PER_HOUR <= 14) %>%
+  summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
+```
+
+```{r}
+wkend_11to2_202310_sf <- joined_bs_pv (bs, pv_wkend_11to2_202310)
+```
+
+```{r}
+wkend_11to2_trips <- honeycomb_grid(wkend_11to2_202310_sf) 
+```
+
+```{r}
+plot_honeycomb_grid_with_trips(wkend_11to2_trips) 
+```
+
+There is a consistent number of trips generated during weekend mornings in residential areas, ranging from 5,000 to 50,000, which is a sign that residents and visitors are engaged in leisure activities or on family outings at this time. In order to meet the needs of a leisure-oriented crowd in these regions, it is imperative that recreational facilities and transit options be optimized.
+
+## Weekend/holiday evening peak
+
+Below chunk of code creates data set pv_wkend_4to7_202310 by filtering the data from the pv dataset for weekend/holiday evening peak between 4PM and 7PM, and computes the total passenger trips at origin for bus stop, utilizing the columns - YEAR_MONTH, DAY_TYPE, and ORIGIN_PT_CODE as grouping criteria.
+
+```{r}
+pv_wkend_4to7_202310 <- pv %>%
+  group_by(YEAR_MONTH, DAY_TYPE, ORIGIN_PT_CODE) %>%
+  filter(YEAR_MONTH == "2023-10" & DAY_TYPE == "WEEKENDS/HOLIDAY" & TIME_PER_HOUR >= 16 & TIME_PER_HOUR <= 19) %>%
+  summarise(ORIGIN_TOTAL_TRIPS = sum(TOTAL_TRIPS, na.rm = TRUE))
+```
+
+```{r}
+wkend_4to7_202310_sf <- joined_bs_pv (bs, pv_wkend_4to7_202310)
+```
+
+```{r}
+wkend_4to7_trips <- honeycomb_grid(wkend_4to7_202310_sf) 
+```
+
+```{r}
+plot_honeycomb_grid_with_trips(wkend_4to7_trips) 
+```
+
+During the evening peak on weekends and holidays, trip volumes between 5,000 and 50,000 indicate ongoing social or leisure activities in residential areas. It's vital to have adequate parking and public transportation, especially in popular entertainment districts at night. When planning recreational facilities, it's helpful to know what kind of activities and attractions draw visitors during these times.
+:::
+
+Passenger trip patterns during both weekday morning and afternoon underscore the importance of commuter-centric transportation. In the morning peak, commuters are concentrated in suburban areas, so transportation services need to be improved. The afternoon peak indicates evening commuters, suggesting transit schedules be optimized to accommodate flexible work hours. In order to meet commuters' diverse needs throughout the day, a well-adapted and efficient transportation system is crucial.
+
+We can observe that for Weekend/Holiday mornings and evenings, trip volumes are more evenly distributed across residential areas, suggesting leisure activities or family outings. These patterns call for optimizing recreational facilities and transit options in these regions to cater to the weekend and holiday crowd.
+
+By analyzing these spatial patterns, urban planners and policymakers can optimize transportation infrastructure, identify high demand areas for public transportation, and plan for congestion management during peak periods in a way that maximizes efficiency and efficiency. In addition, it provides valuable insights into commuter behavior, emphasizing the necessity to tailor transportation services within Singapore based on different time intervals and geographical areas.
+
+# **Emerging Hot Spot Analysis(EHSA)**
