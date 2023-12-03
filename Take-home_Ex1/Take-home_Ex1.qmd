@@ -127,7 +127,7 @@ Before starting to analyse data, use ***glimpse()*** to look at certain attribut
 glimpse(bs)
 ```
 
-## **Aspstial data**
+## **Aspatial data**
 
 ### Import Passenger Volume csv file into R environment
 
