@@ -246,7 +246,8 @@ In this section we will use the maps and spatial data tools to uncover patterns,
 | Weekend/holiday morning peak | 11am to 2pm     |
 | Weekend/holiday evening peak | 4pm to 7pm      |
 
-::: panel-tabset
+## Analysis
+
 ## Weekday morning peak
 
 ### Filter data
@@ -410,9 +411,8 @@ plot_honeycomb_grid_with_trips(wkend_4to7_trips)
 ### Analysis
 
 During the evening peak on weekends and holidays, trip volumes between 5,000 and 50,000 indicate ongoing social or leisure activities in residential areas. It's vital to have adequate parking and public transportation, especially in popular entertainment districts at night. When planning recreational facilities, it's helpful to know what kind of activities and attractions draw visitors during these times.
-:::
 
-## Summary
+## Observation
 
 Passenger trip patterns during both weekday morning and afternoon underscore the importance of commuter-centric transportation. In the morning peak, commuters are concentrated in suburban areas, so transportation services need to be improved. The afternoon peak indicates evening commuters, suggesting transit schedules be optimized to accommodate flexible work hours. In order to meet commuters' diverse needs throughout the day, a well-adapted and efficient transportation system is crucial.
 
@@ -430,13 +430,15 @@ Spatial weights come in two primary forms:
 
 In situations where hexagons don't share borders or adjacency, like in our case, distance-based spatial weights are more suitable.
 
-**Why distance-based weights?**
+**Contiguity-based weights vs distance-based weights**
 
-Contiguity-based weights focus exclusively on neighboring units that share a boundary. In contrast, distance-based weights extend this concept by accounting for the influence of both nearby and more distant neighbors. This approach provides a more comprehensive understanding of spatial interactions, especially when the effects of a phenomenon aren't confined to immediate neighbors. For instance, if a wildfire is spreading, distance-based weights would consider how the wind is transporting it, how far it has spread, and how it is likely to affect distant areas. Contiguity-based weights would only consider nearby units that share the same boundary.
+Contiguity-based weights focus exclusively on neighboring units that share a boundary. In contrast, distance-based weights extend this concept by accounting for the influence of both nearby and more distant neighbors. This approach provides a more comprehensive understanding of spatial interactions, especially when the effects of a phenomenon aren't confined to immediate neighbors.
 
-In contexts like urban studies or environmental analysis, phenomena often impact areas beyond their immediate vicinity. For instance, in urban settings, commuting patterns can affect regions that aren't directly adjacent. Distance-based weights are adept at capturing these broader, non-adjacent interactions, offering a more accurate representation of spatial relationships in such scenarios. Distance-based weights take into account how far two areas are separated, so areas that are closer together receive more weight than those that are farther away. This allows for a more accurate representation of how phenomena spread and interact within a complex environment.
+**Why distance-based weights**?
 
-We further delve into the three main subtypes of these weights:
+In this exercise, the commuting behaviors could influence areas beyond immediate neighbors, making **distance-based weights** a more suitable choice for the study. Distance-based weights are adept at capturing these broader, non-adjacent interactions, offering a more accurate representation of spatial relationships in such scenarios. Distance-based weights take into account how far two areas are separated, so areas that are closer together receive more weight than those that are farther away. This allows for a more accurate representation of how phenomena spread and interact within a complex environment.
+
+We further delve into the three main sub-types:
 
 -   fixed distance weights,
 
@@ -446,9 +448,8 @@ We further delve into the three main subtypes of these weights:
 
 **Why adaptive distance weights**?
 
-A highly urbanized and densely populated city-state was considered in this exercise when choosing the spatial weight type. Thus, **adaptive distance weights** would be more effective. By incorporating the urban core and the more outlying areas into the analysis, a more balanced representation of neighbors would be possible.
+A highly urbanized and densely populated city-state was considered in this exercise when choosing the spatial weight type. In this exercise, hexagon cell are unevenly distributed. Thus, **adaptive distance weights** would be more effective. Adaptive distance weights ensure sure that each unit has a set number of neighbours, there by accomodating areas with varying densities and providing a more consistent and representative measure of local spatial relationships compared to the other 2 methods, which might overlook isolated units or disproportionately weight closer units.
 
-::: panel-tabset
 ## Weekday morning peak
 
 ### Computing adaptive distance weight matrix
@@ -464,7 +465,7 @@ wm_ad
 
 ### **Computing Global Moran' I**
 
-In the code chunk below, global_moran() function is used to compute the Moran's I value. Different from spdep package, the output is a tibble data.frame.
+In the code chunk below, ***global_moran()*** function is used to compute the Moran's I value. Different from **spdep** package, the output is a tibble data.frame.
 
 ```{r}
 moranI <- global_moran(wm_ad$sum_trips,
@@ -472,6 +473,8 @@ moranI <- global_moran(wm_ad$sum_trips,
                        wm_ad$wt)
 glimpse(moranI)
 ```
+
+Moran's I value (0.2) shows that areas with similar passenger trips are slightly more likely to be close to each other than by random chance.
 
 ### **Performing Global Moran'sI test**
 
@@ -572,6 +575,8 @@ moranI <- global_moran(wm_ad$sum_trips,
 glimpse(moranI)
 ```
 
+Moran's I value (0.0559) shows that areas with similar passenger trips are slightly more likely to be close to each other than by random chance. The chance is even higher compared to the weekday morning peak based on both Moran's I value generated.
+
 ### **Performing Global Moran'sI test**
 
 ```{r}
@@ -670,6 +675,8 @@ moranI <- global_moran(wm_ad$sum_trips,
                        wm_ad$wt)
 glimpse(moranI)
 ```
+
+Moran's I value (0.162) shows that areas with similar passenger trips are slightly more likely to be close to each other than by random chance.
 
 ### **Performing Global Moran'sI test**
 
@@ -770,6 +777,8 @@ moranI <- global_moran(wm_ad$sum_trips,
 glimpse(moranI)
 ```
 
+Moran's I value (0.0975) shows that areas with similar passenger trips are slightly more likely to be close to each other than by random chance. The chance is even higher compared to the weekend/holiday morning peak based on both Moran's I value generated.
+
 ### **Performing Global Moran'sI test**
 
 ```{r}
@@ -844,4 +853,9 @@ tm_shape(lisa_sig) +
   tm_fill("mean") + 
   tm_borders(alpha = 0.4)
 ```
-:::
+
+## Observation
+
+The Local Indicators of Spatial Association (LISA) highlight active areas, particularly those classified as high-high regions, where many people travel, and the surrounding areas are as busy. In these high-activity zones, large crowds gather for work-related purposes or daily activities at key destinations, such as shopping centers or office complexes.
+
+This analysis illuminates passenger movement patterns, showing that they are not random, but rather concentrated at specific locations. The discovery of these concentrated areas, or hot spots, holds immense value for urban planners and transportation authorities. It provides an analytical tool to grasp and evaluate the demand for transportation services. The government and planners can make informed transportation planning decisions by identifying areas with high passenger traffic. In addition to tailoring transportation services to meet demand, optimizing routes, and allocating infrastructure resources efficiently, such planning also improves urban mobility and accessibility.
