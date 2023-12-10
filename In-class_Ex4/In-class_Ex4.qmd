@@ -1,0 +1,235 @@
+---
+title: "In Class Exercise 4"
+author: "Flora Phyo Zin Htet"
+---
+
+## Overview
+
+-   performing geocoding using data downloaded from dta.gov.sg
+
+-   calibrating geographically weighted poisson regression
+
+## Getting started
+
+```{r}
+pacman::p_load(tidyverse,sf, httr, tmap, performance, ggpubr)
+```
+
+Lastly, the found data table will joined in the initial csv data table by using a unique identifier (i.e. POSTAL) common to both data tables. The output data table will be save as an csv file called found.
+
+```{r}
+url <- 'https://www.onemap.gov.sg/api/common/elastic/search'
+```
+
+```{r}
+csv <- read_csv("data/aspatial/Generalinformationofschools.csv")
+postcodes <- csv$`postal_code`
+```
+
+```{r}
+found <- data.frame()
+not_founds <- data.frame()
+```
+
+```{r}
+for (postcode in postcodes) {
+  query <- list(`searchVal` = postcode, `returnGeom` ='Y', `getAddrDetails`='Y', `pageNum` = '1')
+  res <- GET(url, query=query)
+  
+  if((content(res)$found) != 0) {
+    found <- rbind(found, data.frame(content(res))[4:13])
+  } else{
+    not_found = data.frame(postcode)
+  }
+}
+```
+
+The code chunk below will be used to combine both found and not_found data.frames into a single tibble data.frame called merged. At the same time, we will merged and not_found tibble data.frames into csv file format for subsequent used.
+
+```{r}
+merged = merge(csv, found, by.x='postal_code', by.y = 'results.POSTAL', all = TRUE)
+write.csv(merged, file="data/aspatial/schools.csv")
+write.csv(not_found, file="data/aspatial/not_found.csv")
+```
+
+## Converting an aspatial data into a simple feature tibble data.frame
+
+### importing and tidying schools data
+
+in this sub-section, you will import schools.csv into R environment and at the same time tidying the data by selecting only the necessary fields as well as rename some fields.
+
+```{r}
+schools <- read_csv("data/aspatial/schools.csv")
+```
+
+```{r}
+  schools <- schools %>%
+  rename(latitude=results.LATITUDE, longitude=results.LONGITUDE)
+```
+
+```{r}
+schools <- schools %>%
+  select(postal_code, school_name, latitude, longitude)
+```
+
+### Converting an aspatial data into sf tibble data.frame
+
+Next, you will convert the asptial data into a simple feature tibble data.frame called schools_sf
+
+refer to st_as_sf() of sf package.
+
+```{r}
+schools <- schools[!is.na(schools$longitude) & !is.na(schools$latitude), ]
+
+schools_sf <- st_as_sf(schools,
+                       coords = c("longitude", "latitude"),
+                       crs=4326) %>% #Use WGS84
+  st_transform(crs = 3414) #Code in WGS84 -- change to geometry point
+```
+
+### Plotting a point simple feature layer
+
+To ensure that schools sf tibble data.frame has been projected and converted correctly, you can plot the schools point data for visual inspection.
+
+```{r}
+tmap_mode("view")
+tm_shape(schools_sf) + 
+  tm_dots() + 
+tm_view(set.zoom.limits = c(11,14))
+```
+
+```{r}
+mpsz = st_read(dsn = "data/geospatial", 
+                  layer = "MP14_SUBZONE_WEB_PL") %>%
+st_transform(crs = 3414)
+```
+
+```{r}
+mpsz$'SCHOOL_COUNT' <- lengths(
+  st_intersects(
+    mpsz, schools_sf))
+```
+
+```{r}
+summary(mpsz$'SCHOOL_COUNT')
+```
+
+```{r}
+business_sf = st_read(dsn = "data/geospatial", 
+                  layer = "Business") %>%
+st_transform(crs = 3414)
+```
+
+```{r}
+tmap_options(check.and.fix = TRUE)
+tm_shape(mpsz) +
+  tm_polygons() + 
+tm_shape(business_sf) +
+  tm_dots()
+```
+
+```{r}
+flow_data <- read_rds("data/rds/flow_data_tidy.rds")
+
+glimpse(flow_data)
+```
+
+Notice that this sf tibble data.frame includes 2 additional fields namely SCHOOL_COUNT and RETAIL_COUNT. Both of them will be used as attractiveness varibales when calibrating origin constrainted SIM
+
+```{r}
+flow_data$FlowNoIntra <- ifelse(
+  flow_data$ORIGIN_SZ == flow_data$DESTIN_SZ,
+  0, flow_data$MORNING_PEAK)
+
+flow_data$offset <- ifelse(
+  flow_data$ORIGIN_SZ == flow_data$DESTIN_SZ,
+  0.000001,1)
+
+inter_zonal_flow <- flow_data %>%
+  filter(FlowNoIntra > 0)
+
+inter_zonal_flow <- inter_zonal_flow %>%
+  rename(TRIPS = MORNING_PEAK,
+         DIST = dist)
+
+```
+
+### Origin (Production) constrained SIM
+
+In this section, we will fit an origin constrained SIM by using the code chunk below.
+
+For origin constraint and destination constraint, no longer need intersects.
+
+```{r}
+orcSIM_Poisson <- glm(formula = TRIPS ~
+                        ORIGIN_SZ + 
+                        log(SCHOOL_COUNT) + #reflect attactiveness factor
+                        log(RETAIL_COUNT) + #try to model
+                        log(DIST) -1, #remove away intersects 
+                      family = poisson(link = "log"),
+                      data = inter_zonal_flow,
+                      na.action = na.exclude) #exclude na
+
+
+```
+
+```{r}
+options(max.print=10000)
+summary(orcSIM_Poisson)
+```
+
+**Note**
+
+```         
+log(SCHOOL_COUNT)  0.4755516  0.0004701  1011.55   <2e-16 *** 
+log(RETAIL_COUNT)  0.1796905  0.0001856   968.12   <2e-16 *** 
+log(DIST)         -1.6929522  0.0004093 -4136.01   <2e-16 ***
+```
+
+-   Check log(DIST) -- must be always negative, inverse relationship.
+
+<!-- -->
+
+-   Attractiveness log(SCHOOL_COUNT) - positive, people will want to stay near school. Also possible it is negative (example for crime rate)
+
+-   P-Value - should be smaller than 0.05, accept as part of the conceptual model. If larger, this attractiveness is not statistically significant.
+
+### Goodness-of-fit (R Squared)
+
+```{r}
+CalcRsquared <- function(observed, estimated) {
+  r <- cor(observed, estimated)
+  R2 <- r^2
+  R2
+}
+```
+
+we can examine how the constraints hold for the destination this time.
+
+```{r}
+CalcRsquared(orcSIM_Poisson$data$TRIPS, orcSIM_Poisson$fitted.values)
+```
+
+```{r}
+performance_rmse(orcSIM_Poisson,
+                 normalized = FALSE)
+```
+
+### Doubly constrained
+
+In this section, we will fit a doubly constrained SIM by using the code chunk below.
+
+The general formula of Doubly Constrained Spatial Interaction Model
+
+```{r}
+dbcSIM_Poisson <- glm(formula = TRIPS ~
+                        ORIGIN_SZ + 
+                        DESTIN_SZ +
+                        log(DIST),
+                      family = poisson(link = "log"),
+                      data = inter_zonal_flow,
+                      na.action = na.exclude)
+dbcSIM_Poisson
+```
+
+\`\`\`
