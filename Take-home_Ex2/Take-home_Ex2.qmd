@@ -2,3 +2,273 @@
 title: "Take-home_Ex2"
 author: "Flora Phyo Zin Htet"
 ---
+
+# Overview
+
+What are the driving forces behind urban dwellers to weak up early in morning to commute from their home locations to their work places? What are the impact of removing a public bus service on the commuters reside along the corridor of the bus route? These and many other questions related to urban mobility are challenges faced by transport operators and urban managers.
+
+To provide answer to this question, traditionally, commuters survey will be used. However, commuters survey is a very costly, time-consuming and laborous, not to mention that the survey data tend to take a long time to clean and analyse. As a result, it is not unusual, by the time the survey report was ready, most of the information already out-of-date!
+
+As city-wide urban infrastructures such as public buses, mass rapid transits, public utilities and roads become digital, the data sets obtained can be used as a framework for tracking movement patterns through space and time. This is particularly true with the recent trend of massive deployment of pervasive computing technologies such as GPS on the vehicles and SMART cards used by public transport commuters.
+
+Unfortunately, this explosive growth of geospatially-referenced data has far outpaced the planner's ability to utilize and transform the data into insightful information thus creating an adverse impact on the return on the investment made to collect and manage this data.
+
+# Getting Started
+
+## **Installing and Loading the R Packages**
+
+The code chunk below install and load **tmap, sf, sp, DT, stplanr, performance, reshape2, ggpubr, units** and **tidyverse** packages into R environment
+
+```{r}
+pacman::p_load(tmap, sf, sp, DT, stplanr,
+               performance, reshape2,
+               ggpubr, units, tidyverse)
+```
+
+# **Data Preparation**
+
+## **Working with Aspatial data**
+
+Import origin_destination_bus_202310.csv into R by using read_csv() of **readr** package. The output is R data frame class, *pv*.
+
+```{r}
+pv <- read_csv("data/aspatial/origin_destination_bus_202310.csv")
+```
+
+Use head() function to print first few rows of the data frame to quickly inspect the dataset's structure and content.
+
+```{r}
+head(pv)
+```
+
+A quick check of pv tibble data frame shows that the values in ORIGIN_PT_CODE and DESTINATON_PT_CODE are in numeric data type. Hence, the code chunk below is used to convert these data values into character data type.
+
+```{r}
+pv$ORIGIN_PT_CODE <- as.factor(pv$ORIGIN_PT_CODE) 
+pv$DESTINATION_PT_CODE <- as.factor(pv$DESTINATION_PT_CODE)
+```
+
+### **Extracting the study data**
+
+We will extract commuting flows on weekday and between 6 and 9 o'clock.
+
+```{r}
+pv6_9 <- pv %>%
+  filter(DAY_TYPE == "WEEKDAY") %>%
+  filter(TIME_PER_HOUR >= 6 &
+           TIME_PER_HOUR <= 9) %>%
+  group_by(ORIGIN_PT_CODE,
+           DESTINATION_PT_CODE) %>%
+  summarise(TRIPS = sum(TOTAL_TRIPS))
+```
+
+Table below shows the content of pv6_9
+
+```{r}
+datatable(pv6_9)
+```
+
+## **Working with Geospatial Data**
+
+We will be using the following geospatial data
+
+**BusStop**: This data provides the location of bus stop as at last quarter of 2022.
+
+```{r}
+busstop <- st_read(dsn = "data/geospatial",
+                   layer = "BusStop") %>%
+  st_transform(crs = 3414)
+```
+
+```{r}
+busstop
+```
+
+**MPSZ-2019**: This data provides the sub-zone boundary of URA Master Plan 2019
+
+```{r}
+mpsz <- st_read(dsn = "data/geospatial",
+                   layer = "MPSZ-2019") %>%
+  st_transform(crs = 3414)
+```
+
+```{r}
+mpsz
+```
+
+```{r}
+hex_Grid <- st_make_grid(busstop, c(750), what = "polygons", square = FALSE)
+
+# To sf and add grid ID
+grid_sf = st_sf(hex_Grid) %>%
+  # add grid ID
+  mutate(grid_id = 1:length(lengths(hex_Grid)))
+
+# count number of points in each grid
+# https://gis.stackexchange.com/questions/323698/counting-points-in-polygons-with-sf-package-of-r
+grid_sf$n_busstops = lengths(st_intersects(grid_sf, busstop))
+
+# remove grid without value of 0 (i.e. no points in side that grid)
+busstop_grid = filter(grid_sf, n_busstops > 0)
+```
+
+## **Geospatial data wrangling**
+
+### **Combining Busstop and Hexagon**
+
+Code chunk below populates busstop_grid sf data frame into busstop sf data frame.
+
+```{r}
+busstop_hex <- st_intersection(busstop, busstop_grid) %>%
+  select(BUS_STOP_N, grid_id) %>%
+  st_drop_geometry()
+```
+
+```{r}
+datatable(busstop_hex)
+```
+
+We are going to append the hexagon from busstop_hex data frame onto odbus6_9 data frame.
+
+```{r}
+pv_data <- left_join(pv6_9 , busstop_hex,
+            by = c("ORIGIN_PT_CODE" = "BUS_STOP_N")) %>%
+  rename(ORIGIN_BS = ORIGIN_PT_CODE,
+         ORIGIN_SZ = grid_id,
+         DESTIN_BS = DESTINATION_PT_CODE)
+```
+
+Check for duplicating records.
+
+```{r}
+duplicate <- pv_data %>%
+  group_by_all() %>%
+  filter(n()>1) %>%
+  ungroup()
+```
+
+Duplicated records are found. The code chunk below will be used to retain the unique records.
+
+```{r}
+pv_data <- unique(pv_data)
+```
+
+Confirm if the duplicating records issue has been addressed fully.
+
+```{r}
+duplicate <- pv_data %>%
+  group_by_all() %>%
+  filter(n()>1) %>%
+  ungroup()
+
+print(nrow(duplicate))
+```
+
+we will update pv_data data frame with the hexagon.
+
+```{r}
+pv_data <- left_join(pv_data , busstop_hex,
+            by = c("DESTIN_BS" = "BUS_STOP_N")) 
+```
+
+Check for duplicating records.
+
+```{r}
+duplicate <- pv_data %>%
+  group_by_all() %>%
+  filter(n()>1) %>%
+  ungroup()
+```
+
+Duplicated records are found. The code chunk below will be used to retain the unique records.
+
+```{r}
+pv_data <- unique(pv_data)
+```
+
+Confirm if the duplicating records issue has been addressed fully.
+
+```{r}
+duplicate <- pv_data %>%
+  group_by_all() %>%
+  filter(n()>1) %>%
+  ungroup()
+
+print(nrow(duplicate))
+```
+
+```{r}
+pv_data <- pv_data %>%
+  rename(DESTIN_SZ = grid_id) %>%
+  drop_na() %>%
+  group_by(ORIGIN_SZ, DESTIN_SZ) %>%
+  summarise(MORNING_PEAK = sum(TRIPS))
+```
+
+## **Visualising Spatial Interaction**
+
+Prepare a desire line by using **stplanr** package.
+
+### **Removing intra-zonal flows**
+
+We will not plot the intra-zonal flows. The code chunk below will be used to remove intra-zonal flows.
+
+```{r}
+pv_data1 <- pv_data[pv_data$ORIGIN_SZ!=pv_data$DESTIN_SZ,]
+```
+
+### **Creating desire lines**
+
+In this code chunk below, `od2line()` of **stplanr** package is used to create the desire lines.
+
+```{r}
+flowLine <- od2line(flow = pv_data1, 
+                    zones = busstop_grid,
+                    zone_code = "grid_id")
+```
+
+### **Visualising the desire lines**
+
+To visualise the resulting desire lines, the code chunk below is used.
+
+```{r}
+tmap_mode("plot")
+
+tmap_options(check.and.fix = TRUE)
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_borders(col = "grey40", lwd = 0.7)
+flowLine %>%  
+tm_shape() +
+  tm_lines(lwd = "MORNING_PEAK",
+           style = "quantile",
+           scale = c(0.1, 1, 3, 5, 7, 10),
+           n = 6,
+           alpha = 0.3 )
+```
+
+When the flow data are very messy and highly skewed like the one shown above, it is wiser to focus on selected flows, for example flow greater than or equal to 5000 as shown below.
+
+```{r}
+tmap_mode("plot")
+
+tmap_options(check.and.fix = TRUE)
+
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_polygons() +
+flowLine %>%  
+  filter(MORNING_PEAK >= 5000) %>%
+tm_shape() +
+  tm_lines(lwd = "MORNING_PEAK",
+           style = "quantile",
+           scale = c(0.1, 1, 3, 5, 7, 10),
+           n = 6,
+           alpha = 0.3 )
+```
+
+### **Spatial Interaction Modelling**
+
+### 
