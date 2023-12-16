@@ -1,5 +1,5 @@
 ---
-title: "Take-home_Ex2"
+title: "Take-home Exercise 2: Applied Spatial Interaction Models: A case study of Singapore public bus commuter flows"
 author: "Flora Phyo Zin Htet"
 ---
 
@@ -17,17 +17,17 @@ Unfortunately, this explosive growth of geospatially-referenced data has far out
 
 ## **Installing and Loading the R Packages**
 
-The code chunk below install and load **tmap, sf, sp, DT, stplanr, performance, reshape2, ggpubr, units** and **tidyverse** packages into R environment
+The code chunk below install and load **tmap, sf, sp, DT, stplanr, performance, reshape2, ggpubr, units, tidyverse** and **knitr** packages into R environment
 
 ```{r}
 pacman::p_load(tmap, sf, sp, DT, stplanr,
                performance, reshape2,
-               ggpubr, units, tidyverse)
+               ggpubr, units, tidyverse, knitr)
 ```
 
 # **Data Preparation**
 
-## **Working with Aspatial data**
+## **Importing Origin Destination Bus Stops Data Set**
 
 Import origin_destination_bus_202310.csv into R by using read_csv() of **readr** package. The output is R data frame class, *pv*.
 
@@ -48,9 +48,7 @@ pv$ORIGIN_PT_CODE <- as.factor(pv$ORIGIN_PT_CODE)
 pv$DESTINATION_PT_CODE <- as.factor(pv$DESTINATION_PT_CODE)
 ```
 
-### **Extracting the study data**
-
-We will extract commuting flows on weekday and between 6 and 9 o'clock.
+For this study, we will extract commuting flows on weekday and between 6 and 9 o'clock.
 
 ```{r}
 pv6_9 <- pv %>%
@@ -68,9 +66,21 @@ Table below shows the content of pv6_9
 datatable(pv6_9)
 ```
 
-## **Working with Geospatial Data**
+Save the output into an rds file format.
 
-We will be using the following geospatial data
+```{r}
+write_rds(pv6_9, "data/rds/pv6_9.rds")
+```
+
+The code chunk below will be used to import the save pv6_9.rds into R environment.
+
+```{r}
+pv6_9 <- read_rds("data/rds/pv6_9.rds")
+```
+
+## **Import Geospatial Data**
+
+For this exercise, we will be using the following geospatial data
 
 **BusStop**: This data provides the location of bus stop as at last quarter of 2022.
 
@@ -96,13 +106,19 @@ mpsz <- st_read(dsn = "data/geospatial",
 mpsz
 ```
 
+## **Geospatial data wrangling**
+
+### Create Hexagon Layer
+
+Create hexagon layer using busstop.
+
 ```{r}
 hex_Grid <- st_make_grid(busstop, c(750), what = "polygons", square = FALSE)
 
 # To sf and add grid ID
 grid_sf = st_sf(hex_Grid) %>%
   # add grid ID
-  mutate(grid_id = 1:length(lengths(hex_Grid)))
+  mutate(grid_id = sprintf("G%05d", row_number()))
 
 # count number of points in each grid
 # https://gis.stackexchange.com/questions/323698/counting-points-in-polygons-with-sf-package-of-r
@@ -112,9 +128,7 @@ grid_sf$n_busstops = lengths(st_intersects(grid_sf, busstop))
 busstop_grid = filter(grid_sf, n_busstops > 0)
 ```
 
-## **Geospatial data wrangling**
-
-### **Combining Busstop and Hexagon**
+### **Combine Busstop & mpsz**
 
 Code chunk below populates busstop_grid sf data frame into busstop sf data frame.
 
@@ -127,6 +141,8 @@ busstop_hex <- st_intersection(busstop, busstop_grid) %>%
 ```{r}
 datatable(busstop_hex)
 ```
+
+### Combine pv6_9 with busstop_hex data
 
 We are going to append the hexagon from busstop_hex data frame onto odbus6_9 data frame.
 
@@ -205,11 +221,21 @@ pv_data <- pv_data %>%
   summarise(MORNING_PEAK = sum(TRIPS))
 ```
 
-## **Visualising Spatial Interaction**
+Save the output into an rds file.
+
+```{r}
+write_rds(pv_data, "data/rds/pv_data.rds")
+```
+
+```{r}
+pv_data <- read_rds("data/rds/pv_data.rds")
+```
+
+# **Visualising Spatial Interaction**
 
 Prepare a desire line by using **stplanr** package.
 
-### **Removing intra-zonal flows**
+## **Removing intra-zonal flows**
 
 We will not plot the intra-zonal flows. The code chunk below will be used to remove intra-zonal flows.
 
@@ -217,7 +243,7 @@ We will not plot the intra-zonal flows. The code chunk below will be used to rem
 pv_data1 <- pv_data[pv_data$ORIGIN_SZ!=pv_data$DESTIN_SZ,]
 ```
 
-### **Creating desire lines**
+## **Creating desire lines**
 
 In this code chunk below, `od2line()` of **stplanr** package is used to create the desire lines.
 
@@ -227,7 +253,7 @@ flowLine <- od2line(flow = pv_data1,
                     zone_code = "grid_id")
 ```
 
-### **Visualising the desire lines**
+## **Visualising the desire lines**
 
 To visualise the resulting desire lines, the code chunk below is used.
 
@@ -245,8 +271,11 @@ tm_shape() +
            style = "quantile",
            scale = c(0.1, 1, 3, 5, 7, 10),
            n = 6,
-           alpha = 0.3 )
+           alpha = 0.3,
+           col = "blue")
 ```
+
+## **Visualising the desire lines (Morning Peak \>= 5000)**
 
 When the flow data are very messy and highly skewed like the one shown above, it is wiser to focus on selected flows, for example flow greater than or equal to 5000 as shown below.
 
@@ -266,9 +295,721 @@ tm_shape() +
            style = "quantile",
            scale = c(0.1, 1, 3, 5, 7, 10),
            n = 6,
-           alpha = 0.3 )
+           alpha = 0.3,
+           col = "blue")
 ```
 
-### **Spatial Interaction Modelling**
+# **Preparing Spatial Interaction Modelling Variables**
 
-### 
+## Business data
+
+### **Importing business data**
+
+```{r}
+business_sf <- st_read(dsn = "data/geospatial",                                               layer = "Business")
+```
+
+```{r}
+business_sf <- business_sf %>%         
+  st_transform(crs = 3414)
+```
+
+### **Performing point-in-polygon count process**
+
+We will count the number of schools located inside the hexagon grid.
+
+```{r}
+busstop_grid$`BIZ_COUNT`<- lengths(         
+  st_intersects(busstop_grid, business_sf))
+```
+
+```{r}
+summary(busstop_grid$BIZ_COUNT)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_polygons() +
+tm_shape(business_sf) +
+  tm_dots() 
+
+```
+
+## F&B data
+
+### **Importing F&B data**
+
+```{r}
+fnb_sf <- st_read(dsn = "data/geospatial",                                          layer = "F&B")
+```
+
+```{r}
+fnb_sf <- fnb_sf %>%            
+  st_transform(crs = 3414)
+```
+
+### **Performing point-in-polygon count process**
+
+We will count the number of F&B located inside the hexagon grid.
+
+```{r}
+busstop_grid$`FnB_COUNT`<- lengths(            
+  st_intersects(busstop_grid, fnb_sf))
+```
+
+```{r}
+summary(busstop_grid$FnB_COUNT)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_polygons() +
+tm_shape(fnb_sf) +
+  tm_dots() 
+```
+
+## FinServ data
+
+### **Importing FinServ data**
+
+```{r}
+finServ_sf <- st_read(dsn = "data/geospatial",                                              layer = "FinServ")
+```
+
+```{r}
+finServ_sf <- finServ_sf %>%            
+  st_transform(crs = 3414)
+```
+
+### **Performing point-in-polygon count process**
+
+We will count the number of retails located inside the hexagon grid.
+
+```{r}
+busstop_grid$`FINSERV_COUNT`<- lengths(            
+  st_intersects(busstop_grid, finServ_sf))
+```
+
+```{r}
+summary(busstop_grid$FINSERV_COUNT)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_polygons() +
+tm_shape(finServ_sf) +
+  tm_dots() 
+```
+
+## Busstop data
+
+### Importing Busstop data
+
+busstop data imported in previous section.
+
+```{r}
+busstop
+```
+
+### **Performing point-in-polygon count process**
+
+```{r}
+busstop_grid$`BUSSTOP_COUNT`<- lengths(            
+  st_intersects(busstop_grid, busstop))
+```
+
+```{r}
+summary(busstop_grid$BUSSTOP_COUNT)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_polygons() +
+tm_shape(busstop) +
+  tm_dots() 
+```
+
+## Train Station Exit Layer data
+
+### Importing Train Station Exit Layer data
+
+```{r}
+texit_sf <- st_read(dsn = "data/geospatial",                                              layer = "Train_Station_Exit_Layer")
+```
+
+```{r}
+texit_sf <- texit_sf %>%            
+  st_transform(crs = 3414)
+```
+
+### **Performing point-in-polygon count process**
+
+We will count the number of retails located inside the hexagon grid.
+
+```{r}
+busstop_grid$`TEXIT_COUNT`<- lengths(            
+  st_intersects(busstop_grid, texit_sf))
+```
+
+```{r}
+summary(busstop_grid$TEXIT_COUNT)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_polygons() +
+tm_shape(texit_sf) +
+  tm_dots() 
+```
+
+## Aspatial data - HDB data
+
+### Import HDB Data
+
+```{r}
+hdb <- read.csv("data/aspatial/hdb.csv")
+```
+
+Tidying the data by selecting only the necessary fields as well as rename some fields.
+
+```{r}
+hdb <- hdb %>%
+  rename(latitude = "lat",
+        longitude = "lng") %>%
+  select(postal, addr, latitude, longitude)
+```
+
+### Converting an aspatial data into sf tibble data.frame
+
+Convert hdb tibble data.frame data into a simple feature tibble data.frame called *hdb_sf* by using values in latitude and longitude fields.
+
+Refer to [st_as_sf()](https://r-spatial.github.io/sf/reference/st_as_sf.html) of sf package.
+
+```{r}
+hdb_sf <- st_as_sf(hdb, 
+                       coords = c("longitude", "latitude"),
+                       crs=4326) %>%
+  st_transform(crs = 3414)
+```
+
+### **Performing point-in-polygon count process**
+
+We will count the number of hdb located inside the hexagon grid.
+
+```{r}
+busstop_grid$`HDB_COUNT`<- lengths(            
+  st_intersects(busstop_grid, hdb_sf))
+```
+
+```{r}
+summary(busstop_grid$HDB_COUNT)
+```
+
+```{r}
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(busstop_grid) +
+  tm_polygons() +
+tm_shape(hdb_sf) +
+  tm_dots() 
+```
+
+## Join with pv_data
+
+```{r}
+busstop_grid_tidy <- busstop_grid %>%
+  st_drop_geometry() %>%
+  select(grid_id, BIZ_COUNT, FnB_COUNT, FINSERV_COUNT, BUSSTOP_COUNT, TEXIT_COUNT, HDB_COUNT)
+```
+
+```{r}
+flow_data <- pv_data1 %>%
+  left_join(busstop_grid_tidy,
+            by = c("DESTIN_SZ" = "grid_id")) 
+```
+
+### **Checking for variables with zero values**
+
+Since Poisson Regression is based of log and log 0 is undefined, it is important for us to ensure that no 0 values in the explanatory variables.
+
+In the code chunk below, summary() of Base R is used to compute the summary statistics of all variables in *wd_od* data frame.
+
+```{r}
+summary(flow_data)
+```
+
+Code chunk below will be used to replace zero values to 0.99.
+
+```{r}
+flow_data$BIZ_COUNT <- ifelse(
+  flow_data$BIZ_COUNT == 0,
+  0.99, flow_data$BIZ_COUNT)
+flow_data$FnB_COUNT <- ifelse(
+  flow_data$FnB_COUNT == 0,
+  0.99, flow_data$FnB_COUNT)
+flow_data$FINSERV_COUNT <- ifelse(
+  flow_data$FINSERV_COUNT == 0,
+  0.99, flow_data$FINSERV_COUNT)
+flow_data$BUSSTOP_COUNT <- ifelse(
+  flow_data$BUSSTOP_COUNT == 0,
+  0.99, flow_data$BUSSTOP_COUNT)
+flow_data$TEXIT_COUNT <- ifelse(
+  flow_data$TEXIT_COUNT == 0,
+  0.99, flow_data$TEXIT_COUNT)
+flow_data$HDB_COUNT <- ifelse(
+  flow_data$HDB_COUNT == 0,
+  0.99, flow_data$HDB_COUNT)
+```
+
+Run the summary() again to check.
+
+```{r}
+summary(flow_data)
+```
+
+Save the output into an rds file.
+
+```{r}
+write_rds(flow_data, "data/rds/flow_data.rds")
+```
+
+# **Computing the distance matrix**
+
+### **Converting from sf data.table to SpatialPolygonsDataFrame**
+
+First [`as.Spatial()`](https://r-spatial.github.io/sf/reference/coerce-methods.html) will be used to convert *mpsz* from sf tibble data frame to SpatialPolygonsDataFrame of sp object as shown in the code chunk below.
+
+```{r}
+busstop_grid_sp <- as(busstop_grid, "Spatial")
+busstop_grid_sp
+```
+
+### **Computing the distance matrix**
+
+Next, [`spDists()`](https://www.rdocumentation.org/packages/sp/versions/2.1-1/topics/spDistsN1) of sp package will be used to compute the Euclidean distance between the centroids of the trid.
+
+```{r}
+dist <- spDists(busstop_grid_sp, 
+                longlat = FALSE)
+head(dist, n=c(10, 10))
+```
+
+### **Label column and row headers of a distance matrix**
+
+First, we will create a list sorted according to the the distance matrix by grid_id.
+
+```{r}
+sz_names <- busstop_grid_sp$grid_id
+```
+
+Next we will attach `grid_id` to row and column for distance matrix matching ahead.
+
+```{r}
+colnames(dist) <- paste0(sz_names)
+rownames(dist) <- paste0(sz_names)
+```
+
+### **Pivoting distance value by grid_id**
+
+```{r}
+distPair <- melt(dist) %>%
+  rename(dist = value)
+head(distPair, 10)
+```
+
+Notice that the within zone distance is 0.
+
+### **Update intra-zonal distances**
+
+We are going to append a constant value to replace the intra-zonal distance of 0.
+
+First, we will select and find out the minimum value of the distance by using `summary()`.
+
+```{r}
+distPair %>%
+  filter(dist > 0) %>%
+  summary()
+```
+
+Next, a constant distance value of 50m is added into intra-zones distance.
+
+```{r}
+distPair$dist <- ifelse(distPair$dist == 0,
+                        50, distPair$dist)
+```
+
+The code chunk below will be used to check the result data.frame.
+
+```{r}
+distPair %>%
+  summary()
+```
+
+The code chunk below is used to rename the origin and destination fields.
+
+```{r}
+distPair <- distPair %>%
+  rename(orig = Var1,
+         dest = Var2)
+```
+
+Save the output into an rds file.
+
+```{r}
+write_rds(distPair, "data/rds/distPair.rds")
+```
+
+# Spatial Interaction Modelling
+
+## **Preparing flow data**
+
+```{r}
+flow_data <- read_rds("data/rds/flow_data.rds")
+```
+
+```{r}
+head(flow_data, 10)
+```
+
+### **Separating intra-flow from passenger volume df**
+
+Code chunk below is used to add three new fields in `flow_data` dataframe.
+
+```{r}
+flow_data$FlowNoIntra <- ifelse(
+  flow_data$ORIGIN_SZ == flow_data$DESTIN_SZ, 
+  0, flow_data$MORNING_PEAK)
+flow_data$offset <- ifelse(
+  flow_data$ORIGIN_SZ == flow_data$DESTIN_SZ, 
+  0.000001, 1)
+```
+
+### **Combining passenger volume data with distance value**
+
+Before we can join *flow_data* and *distPair*, we need to convert data value type of *ORIGIN_SZ* and *DESTIN_SZ* fields of flow_data dataframe into factor data type.
+
+```{r}
+flow_data$ORIGIN_SZ <- as.factor(flow_data$ORIGIN_SZ)
+flow_data$DESTIN_SZ <- as.factor(flow_data$DESTIN_SZ)
+```
+
+Now, `left_join()` of **dplyr** will be used to *flow_data* dataframe and *distPair* dataframe. The output is called *flow_data1*.
+
+```{r}
+flow_data1 <- flow_data %>%
+  left_join (distPair,
+             by = c("ORIGIN_SZ" = "orig",
+                    "DESTIN_SZ" = "dest"))
+```
+
+```{r}
+glimpse(flow_data1)
+```
+
+Save the output into an rds file.
+
+```{r}
+write_rds(flow_data1, "data/rds/SIM_data.rds")
+```
+
+## **Calibrating Spatial Interaction Models**
+
+### **Importing the modelling data**
+
+Import the modelling data by using the code chunk below.
+
+```{r}
+SIM_data <- read_rds("data/rds/SIM_data.rds")
+```
+
+### **Visualising the dependent variable**
+
+Firstly, let us plot the distribution of the dependent variable (i.e. MORNING_PEAK) by using histogram method by using the code chunk below.
+
+```{r}
+ggplot(data = SIM_data,
+       aes(x = MORNING_PEAK)) +
+  geom_histogram()
+```
+
+Notice that the distribution is highly skewed and not resemble bell shape or also known as normal distribution.
+
+Next, let us visualise the relation between the dependent variable and one of the key independent variable in Spatial Interaction Model, namely distance.
+
+```{r}
+ggplot(data = SIM_data,
+       aes(x = dist,
+           y = MORNING_PEAK)) +
+  geom_point() +
+  geom_smooth(method = lm)
+```
+
+Notice that their relationship hardly resemble linear relationship.
+
+On the other hand, plot the scatter plot by using the log transformed version of both variables, we can see that their relationship is more resemble linear relationship.
+
+```{r}
+ggplot(data = SIM_data,
+       aes(x = log(dist),
+           y = log(MORNING_PEAK))) +
+  geom_point() +
+  geom_smooth(method = lm)
+```
+
+### **Checking for variables with zero values**
+
+Since Poisson Regression is based of log and log 0 is undefined, it is important for us to ensure that no 0 values in the explanatory variables.
+
+In the code chunk below, summary() of Base R is used to compute the summary statistics of all variables in *SIM_data* data frame.
+
+```{r}
+summary(SIM_data)
+```
+
+All the 0 values have been replaced by 0.99 in previous section.
+
+## **Unconstrained Spatial Interaction Model**
+
+In this section, we will calibrate an unconstrained spatial interaction model by using `glm()` of Base Stats.
+
+```{r}
+uncSIM <- glm(formula = MORNING_PEAK ~ 
+                log(BIZ_COUNT) + 
+                log(FnB_COUNT) +
+                log(FINSERV_COUNT) +
+                log(BUSSTOP_COUNT) +
+                log(TEXIT_COUNT) +
+                log(HDB_COUNT) +
+                log(dist),
+              family = poisson(link = "log"),
+              data = SIM_data,
+              na.action = na.exclude)
+uncSIM
+```
+
+## **R-squared function**
+
+In order to measure how much variation of the trips can be accounted by the model we will write a function to calculate R-Squared value as shown below.
+
+```{r}
+CalcRSquared <- function(observed,estimated){
+  r <- cor(observed,estimated)
+  R2 <- r^2
+  R2
+}
+```
+
+Next, we will compute the R-squared of the unconstrained SIM by using the code chunk below.
+
+```{r}
+CalcRSquared(uncSIM$data$MORNING_PEAK, uncSIM$fitted.values)
+```
+
+```{r}
+r2_mcfadden(uncSIM)
+```
+
+## **Origin (Production) constrained SIM**
+
+In this section, we will fit an origin constrained SIM by using the code3 chunk below.
+
+```{r}
+orcSIM <- glm(formula = MORNING_PEAK ~ 
+                 ORIGIN_SZ +
+                 log(BIZ_COUNT) + 
+                 log(FnB_COUNT) +
+                 log(FINSERV_COUNT) +
+                 log(BUSSTOP_COUNT) +
+                 log(TEXIT_COUNT) +
+                 log(HDB_COUNT) +
+                 log(dist),
+              family = poisson(link = "log"),
+              data = SIM_data,
+              na.action = na.exclude)
+summary(orcSIM)
+```
+
+We can examine how the constraints hold for destinations this time.
+
+```{r}
+CalcRSquared(orcSIM$data$MORNING_PEAK, orcSIM$fitted.values)
+```
+
+## **Destination constrained**
+
+In this section, we will fit a destination constrained SIM by using the code chunk below.
+
+```{r}
+decSIM <- glm(formula = MORNING_PEAK ~ 
+                DESTIN_SZ + 
+                log(BIZ_COUNT) + 
+                log(FnB_COUNT) +
+                log(FINSERV_COUNT) +
+                log(BUSSTOP_COUNT) +
+                log(TEXIT_COUNT) +
+                log(HDB_COUNT) +
+                log(dist),
+              family = poisson(link = "log"),
+              data = SIM_data,
+              na.action = na.exclude)
+summary(decSIM)
+```
+
+We can examine how the constraints hold for destinations this time.
+
+```{r}
+CalcRSquared(decSIM$data$MORNING_PEAK, decSIM$fitted.values)
+```
+
+## **Doubly constrained**
+
+In this section, we will fit a doubly constrained SIM by using the code chunk below.
+
+```{r}
+dbcSIM <- glm(formula = MORNING_PEAK ~ 
+                ORIGIN_SZ + 
+                DESTIN_SZ + 
+                log(dist),
+              family = poisson(link = "log"),
+              data = SIM_data,
+              na.action = na.exclude)
+summary(dbcSIM)
+```
+
+We can examine how the constraints hold for destinations this time.
+
+```{r}
+CalcRSquared(dbcSIM$data$MORNING_PEAK, dbcSIM$fitted.values)
+```
+
+### **Model comparison**
+
+Another useful model performance measure for continuous dependent variable is [Root Mean Squared Error](https://towardsdatascience.com/what-does-rmse-really-mean-806b65f2e48e). In this sub-section, you will learn how to use [`compare_performance()`](https://easystats.github.io/performance/reference/compare_performance.html) of [**performance**](https://easystats.github.io/performance/) package.
+
+First of all, let us create a list called *model_list* by using the code chun below.
+
+```{r}
+model_list <- list(unconstrained=uncSIM,
+                   originConstrained=orcSIM,
+                   destinationConstrained=decSIM,
+                   doublyConstrained=dbcSIM)
+```
+
+Next, we will compute the RMSE of all the models in *model_list* file by using the code chunk below.
+
+```{r}
+compare_performance(model_list,
+                    metrics = "RMSE")
+```
+
+The print above reveals that origin constrained SIM is the best model among all the four SIMs because it has the smallest RMSE value of 1473.450.
+
+## **Visualising fitted**
+
+Visualise the observed values and the fitted values.
+
+Firstly we will extract the fitted values from each model by using the code chunk below.
+
+```{r}
+df <- as.data.frame(uncSIM$fitted.values) %>%
+  round(digits = 0)
+```
+
+Next, we will join the values to *SIM_data* data frame.
+
+```{r}
+SIM_data <- SIM_data %>%
+  cbind(df) %>%
+  rename(uncTRIPS = "uncSIM$fitted.values")
+```
+
+Repeat the same step by for Origin Constrained SIM (i.e. orcSIM)
+
+```{r}
+df <- as.data.frame(orcSIM$fitted.values) %>%
+  round(digits = 0)
+```
+
+```{r}
+SIM_data <- SIM_data %>%
+  cbind(df) %>%
+  rename(orcTRIPS = "orcSIM$fitted.values")
+```
+
+Repeat the same step by for Destination Constrained SIM (i.e. decSIM)
+
+```{r}
+df <- as.data.frame(decSIM$fitted.values) %>%
+  round(digits = 0)
+```
+
+```{r}
+SIM_data <- SIM_data %>%
+  cbind(df) %>%
+  rename(decTRIPS = "decSIM$fitted.values")
+```
+
+Repeat the same step by for Doubly Constrained SIM (i.e. dbcSIM)
+
+```{r}
+df <- as.data.frame(dbcSIM$fitted.values) %>%
+  round(digits = 0)
+```
+
+```{r}
+SIM_data <- SIM_data %>%
+  cbind(df) %>%
+  rename(dbcTRIPS = "dbcSIM$fitted.values")
+```
+
+```{r}
+unc_p <- ggplot(data = SIM_data,
+                aes(x = uncTRIPS,
+                    y = MORNING_PEAK)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+orc_p <- ggplot(data = SIM_data,
+                aes(x = orcTRIPS,
+                    y = MORNING_PEAK)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+dec_p <- ggplot(data = SIM_data,
+                aes(x = decTRIPS,
+                    y = MORNING_PEAK)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+dbc_p <- ggplot(data = SIM_data,
+                aes(x = dbcTRIPS,
+                    y = MORNING_PEAK)) +
+  geom_point() +
+  geom_smooth(method = lm)
+
+ggarrange(unc_p, orc_p, dec_p, dbc_p,
+          ncol = 2,
+          nrow = 2)
+```
