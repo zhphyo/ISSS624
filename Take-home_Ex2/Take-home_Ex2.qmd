@@ -264,15 +264,14 @@ tmap_options(check.and.fix = TRUE)
 tm_shape(mpsz) +
   tm_polygons() +
 tm_shape(busstop_grid) +
-  tm_borders(col = "grey40", lwd = 0.7)
+  tm_borders()
 flowLine %>%  
 tm_shape() +
   tm_lines(lwd = "MORNING_PEAK",
            style = "quantile",
            scale = c(0.1, 1, 3, 5, 7, 10),
            n = 6,
-           alpha = 0.3,
-           col = "blue")
+           alpha = 0.3)
 ```
 
 ## **Visualising the desire lines (Morning Peak \>= 5000)**
@@ -295,11 +294,28 @@ tm_shape() +
            style = "quantile",
            scale = c(0.1, 1, 3, 5, 7, 10),
            n = 6,
-           alpha = 0.3,
-           col = "blue")
+           alpha = 0.3)
 ```
 
 # **Preparing Spatial Interaction Modelling Variables**
+
+As we are interested in the factors that influence **weekday morning peak (6AM - 9am)** peak period bus commuting patterns, we will consider the following variables.
+
+## Attractiveness variable
+
+**Business data -** Passengers commuting to their workplaces.
+
+**F&B data -** Passengers visiting food and beverage outlets, either for dining or working.
+
+**FinServ data -** People visiting the financial centers, either to get the services or work within the Financial sector.
+
+## Propulsive variable
+
+**Bus Stop -** Passengers started their journey or align at the bus stop to transfer to another bus in order to reach their final destination
+
+**Train Exit -** Passengers align at the train station and transfer to bus to reach their final destination
+
+**HDB -** Residents in the area are the potential to become bus passengers
 
 ## Business data
 
@@ -329,13 +345,13 @@ summary(busstop_grid$BIZ_COUNT)
 
 ```{r}
 tmap_mode("plot")
-
+tmap_options(check.and.fix = TRUE)
 tm_shape(mpsz) +
   tm_polygons() +
 tm_shape(busstop_grid) +
   tm_polygons() +
 tm_shape(business_sf) +
-  tm_dots() 
+  tm_dots(col = "blue", size = 0.001) 
 
 ```
 
@@ -367,13 +383,13 @@ summary(busstop_grid$FnB_COUNT)
 
 ```{r}
 tmap_mode("plot")
-
+tmap_options(check.and.fix = TRUE)
 tm_shape(mpsz) +
   tm_polygons() +
 tm_shape(busstop_grid) +
   tm_polygons() +
 tm_shape(fnb_sf) +
-  tm_dots() 
+  tm_dots(col = "blue", size = 0.001) 
 ```
 
 ## FinServ data
@@ -405,12 +421,13 @@ summary(busstop_grid$FINSERV_COUNT)
 ```{r}
 tmap_mode("plot")
 
+tmap_options(check.and.fix = TRUE)
 tm_shape(mpsz) +
   tm_polygons() +
 tm_shape(busstop_grid) +
   tm_polygons() +
 tm_shape(finServ_sf) +
-  tm_dots() 
+  tm_dots(col = "blue", size = 0.001) 
 ```
 
 ## Busstop data
@@ -437,12 +454,13 @@ summary(busstop_grid$BUSSTOP_COUNT)
 ```{r}
 tmap_mode("plot")
 
+tmap_options(check.and.fix = TRUE)
 tm_shape(mpsz) +
   tm_polygons() +
 tm_shape(busstop_grid) +
   tm_polygons() +
 tm_shape(busstop) +
-  tm_dots() 
+  tm_dots(col = "blue", size = 0.001) 
 ```
 
 ## Train Station Exit Layer data
@@ -474,15 +492,16 @@ summary(busstop_grid$TEXIT_COUNT)
 ```{r}
 tmap_mode("plot")
 
+tmap_options(check.and.fix = TRUE)
 tm_shape(mpsz) +
   tm_polygons() +
 tm_shape(busstop_grid) +
   tm_polygons() +
 tm_shape(texit_sf) +
-  tm_dots() 
+  tm_dots(col = "blue", size = 0.001) 
 ```
 
-## Aspatial data - HDB data
+## HDB data
 
 ### Import HDB Data
 
@@ -528,15 +547,18 @@ summary(busstop_grid$HDB_COUNT)
 ```{r}
 tmap_mode("plot")
 
+tmap_options(check.and.fix = TRUE)
 tm_shape(mpsz) +
   tm_polygons() +
 tm_shape(busstop_grid) +
   tm_polygons() +
 tm_shape(hdb_sf) +
-  tm_dots() 
+  tm_dots(col = "blue", size = 0.001) 
 ```
 
-## Join with pv_data
+## Join propulsive and attractiveness variable with pv_data
+
+Tidy up the busstop_grid
 
 ```{r}
 busstop_grid_tidy <- busstop_grid %>%
@@ -544,10 +566,30 @@ busstop_grid_tidy <- busstop_grid %>%
   select(grid_id, BIZ_COUNT, FnB_COUNT, FINSERV_COUNT, BUSSTOP_COUNT, TEXIT_COUNT, HDB_COUNT)
 ```
 
+Join propulsive variable to form flow data
+
 ```{r}
 flow_data <- pv_data1 %>%
   left_join(busstop_grid_tidy,
-            by = c("DESTIN_SZ" = "grid_id")) 
+            by = c("ORIGIN_SZ" = "grid_id")) %>%
+  rename(
+    ORIG_HDB_COUNT = HDB_COUNT,
+    ORIG_BUSSTOP_COUNT = BUSSTOP_COUNT,
+    ORIG_TEXIT_COUNT = TEXIT_COUNT) %>%
+  select (-c(BIZ_COUNT,FnB_COUNT,FINSERV_COUNT))
+```
+
+Join attractive variable to form flow data
+
+```{r}
+flow_data <- flow_data %>%
+  left_join(busstop_grid_tidy,
+            by = c("DESTIN_SZ" = "grid_id")) %>%
+  rename(
+    DEST_BIZ_COUNT = BIZ_COUNT,
+    DEST_FnB_COUNT = FnB_COUNT,
+    DEST_FINSERV_COUNT = FINSERV_COUNT) %>%
+  select (-c(HDB_COUNT,BUSSTOP_COUNT,TEXIT_COUNT))
 ```
 
 ### **Checking for variables with zero values**
@@ -563,24 +605,24 @@ summary(flow_data)
 Code chunk below will be used to replace zero values to 0.99.
 
 ```{r}
-flow_data$BIZ_COUNT <- ifelse(
-  flow_data$BIZ_COUNT == 0,
-  0.99, flow_data$BIZ_COUNT)
-flow_data$FnB_COUNT <- ifelse(
-  flow_data$FnB_COUNT == 0,
-  0.99, flow_data$FnB_COUNT)
-flow_data$FINSERV_COUNT <- ifelse(
-  flow_data$FINSERV_COUNT == 0,
-  0.99, flow_data$FINSERV_COUNT)
-flow_data$BUSSTOP_COUNT <- ifelse(
-  flow_data$BUSSTOP_COUNT == 0,
-  0.99, flow_data$BUSSTOP_COUNT)
-flow_data$TEXIT_COUNT <- ifelse(
-  flow_data$TEXIT_COUNT == 0,
-  0.99, flow_data$TEXIT_COUNT)
-flow_data$HDB_COUNT <- ifelse(
-  flow_data$HDB_COUNT == 0,
-  0.99, flow_data$HDB_COUNT)
+flow_data$DEST_BIZ_COUNT <- ifelse(
+  flow_data$DEST_BIZ_COUNT == 0,
+  0.99, flow_data$DEST_BIZ_COUNT)
+flow_data$DEST_FnB_COUNT <- ifelse(
+  flow_data$DEST_FnB_COUNT == 0,
+  0.99, flow_data$DEST_FnB_COUNT)
+flow_data$DEST_FINSERV_COUNT <- ifelse(
+  flow_data$DEST_FINSERV_COUNT == 0,
+  0.99, flow_data$DEST_FINSERV_COUNT)
+flow_data$ORIG_BUSSTOP_COUNT <- ifelse(
+  flow_data$ORIG_BUSSTOP_COUNT == 0,
+  0.99, flow_data$ORIG_BUSSTOP_COUNT)
+flow_data$ORIG_TEXIT_COUNT <- ifelse(
+  flow_data$ORIG_TEXIT_COUNT == 0,
+  0.99, flow_data$ORIG_TEXIT_COUNT)
+flow_data$ORIG_HDB_COUNT <- ifelse(
+  flow_data$ORIG_HDB_COUNT == 0,
+  0.99, flow_data$ORIG_HDB_COUNT)
 ```
 
 Run the summary() again to check.
@@ -597,7 +639,7 @@ write_rds(flow_data, "data/rds/flow_data.rds")
 
 # **Computing the distance matrix**
 
-### **Converting from sf data.table to SpatialPolygonsDataFrame**
+## **Converting from sf data.table to SpatialPolygonsDataFrame**
 
 First [`as.Spatial()`](https://r-spatial.github.io/sf/reference/coerce-methods.html) will be used to convert *mpsz* from sf tibble data frame to SpatialPolygonsDataFrame of sp object as shown in the code chunk below.
 
@@ -606,7 +648,7 @@ busstop_grid_sp <- as(busstop_grid, "Spatial")
 busstop_grid_sp
 ```
 
-### **Computing the distance matrix**
+## **Computing the distance matrix**
 
 Next, [`spDists()`](https://www.rdocumentation.org/packages/sp/versions/2.1-1/topics/spDistsN1) of sp package will be used to compute the Euclidean distance between the centroids of the trid.
 
@@ -790,25 +832,6 @@ summary(SIM_data)
 
 All the 0 values have been replaced by 0.99 in previous section.
 
-## **Unconstrained Spatial Interaction Model**
-
-In this section, we will calibrate an unconstrained spatial interaction model by using `glm()` of Base Stats.
-
-```{r}
-uncSIM <- glm(formula = MORNING_PEAK ~ 
-                log(BIZ_COUNT) + 
-                log(FnB_COUNT) +
-                log(FINSERV_COUNT) +
-                log(BUSSTOP_COUNT) +
-                log(TEXIT_COUNT) +
-                log(HDB_COUNT) +
-                log(dist),
-              family = poisson(link = "log"),
-              data = SIM_data,
-              na.action = na.exclude)
-uncSIM
-```
-
 ## **R-squared function**
 
 In order to measure how much variation of the trips can be accounted by the model we will write a function to calculate R-Squared value as shown below.
@@ -821,6 +844,25 @@ CalcRSquared <- function(observed,estimated){
 }
 ```
 
+## **Unconstrained Spatial Interaction Model**
+
+In this section, we will calibrate an unconstrained spatial interaction model by using `glm()` of Base Stats.
+
+```{r}
+uncSIM <- glm(formula = MORNING_PEAK ~ 
+                log(ORIG_BUSSTOP_COUNT) +
+                log(ORIG_TEXIT_COUNT) +
+                log(ORIG_HDB_COUNT) +
+                log(DEST_BIZ_COUNT) + 
+                log(DEST_FnB_COUNT) +
+                log(DEST_FINSERV_COUNT) +
+                log(dist),
+              family = poisson(link = "log"),
+              data = SIM_data,
+              na.action = na.exclude)
+uncSIM
+```
+
 Next, we will compute the R-squared of the unconstrained SIM by using the code chunk below.
 
 ```{r}
@@ -831,6 +873,10 @@ CalcRSquared(uncSIM$data$MORNING_PEAK, uncSIM$fitted.values)
 r2_mcfadden(uncSIM)
 ```
 
+### Analysis
+
+This model suggests that increases in **bus stop, train exits** and **hdb** at source and in the **business count** and **financial services count** at destinaion are associated with an increase in the number of trips. Increase in **F&B Outlet** doesn't have much impact on trips generation to destination. When the distance increases, the number of trips will decreases.
+
 ## **Origin (Production) constrained SIM**
 
 In this section, we will fit an origin constrained SIM by using the code3 chunk below.
@@ -838,12 +884,9 @@ In this section, we will fit an origin constrained SIM by using the code3 chunk 
 ```{r}
 orcSIM <- glm(formula = MORNING_PEAK ~ 
                  ORIGIN_SZ +
-                 log(BIZ_COUNT) + 
-                 log(FnB_COUNT) +
-                 log(FINSERV_COUNT) +
-                 log(BUSSTOP_COUNT) +
-                 log(TEXIT_COUNT) +
-                 log(HDB_COUNT) +
+                log(DEST_BIZ_COUNT) + 
+                log(DEST_FnB_COUNT) +
+                log(DEST_FINSERV_COUNT) +
                  log(dist),
               family = poisson(link = "log"),
               data = SIM_data,
@@ -857,6 +900,10 @@ We can examine how the constraints hold for destinations this time.
 CalcRSquared(orcSIM$data$MORNING_PEAK, orcSIM$fitted.values)
 ```
 
+### Analysis
+
+Not all the attractiveness values used in this study has impact the number of trips people take in the morning peak hour. This model suggests that increases in the **business count** and **financial services count** are associated with an increase in the number of trips. Increase in **F&B Outlet** doesn't have much impact on trips generation to destination. The **negative coefficient for distance** indicates that as the distance increases, the number of trips decreases, is expected.
+
 ## **Destination constrained**
 
 In this section, we will fit a destination constrained SIM by using the code chunk below.
@@ -864,12 +911,9 @@ In this section, we will fit a destination constrained SIM by using the code chu
 ```{r}
 decSIM <- glm(formula = MORNING_PEAK ~ 
                 DESTIN_SZ + 
-                log(BIZ_COUNT) + 
-                log(FnB_COUNT) +
-                log(FINSERV_COUNT) +
-                log(BUSSTOP_COUNT) +
-                log(TEXIT_COUNT) +
-                log(HDB_COUNT) +
+                log(ORIG_BUSSTOP_COUNT) +
+                log(ORIG_TEXIT_COUNT) +
+                log(ORIG_HDB_COUNT) +
                 log(dist),
               family = poisson(link = "log"),
               data = SIM_data,
@@ -882,6 +926,10 @@ We can examine how the constraints hold for destinations this time.
 ```{r}
 CalcRSquared(decSIM$data$MORNING_PEAK, decSIM$fitted.values)
 ```
+
+### Analysis
+
+All the propulsive values used in this study has impact the number of trips people take in the morning peak hour. From the result, increases in the **busstop, train exit station** and **hdb** are associated with an increase in the number of trips to the destination. The **negative coefficient for distance** indicates that as the distance increases, the number of trips decreases, is expected.
 
 ## **Doubly constrained**
 
@@ -904,7 +952,11 @@ We can examine how the constraints hold for destinations this time.
 CalcRSquared(dbcSIM$data$MORNING_PEAK, dbcSIM$fitted.values)
 ```
 
-### **Model comparison**
+### Analysis
+
+The negative coefficient for **distance** indicates that as the distance increases, the number of trips decreases, is expected.
+
+## **Model comparison**
 
 Another useful model performance measure for continuous dependent variable is [Root Mean Squared Error](https://towardsdatascience.com/what-does-rmse-really-mean-806b65f2e48e). In this sub-section, you will learn how to use [`compare_performance()`](https://easystats.github.io/performance/reference/compare_performance.html) of [**performance**](https://easystats.github.io/performance/) package.
 
@@ -924,7 +976,7 @@ compare_performance(model_list,
                     metrics = "RMSE")
 ```
 
-The print above reveals that origin constrained SIM is the best model among all the four SIMs because it has the smallest RMSE value of 1473.450.
+The print above reveals that doubly constraint SIM is the best model among all the four SIMs because it has the smallest RMSE value of 1172.123.
 
 ## **Visualising fitted**
 
